@@ -238,7 +238,7 @@ completa del ticket queda visible.
 ---
 
 ## EN DESARROLLO — 2026-05-24
-[sprint, lead, equipo, notas de arranque]
+[leads de desarrollo]
 …
 ```
 

@@ -70,7 +70,7 @@ Cada comando del CLI **añade** un bloque al final de la descripción de Jira �
 [acta de traspaso: estimación, riesgos, dependencias]
 ---
 ## EN DESARROLLO — 2026-05-24
-[sprint, lead, equipo, notas de arranque]
+[leads de desarrollo]
 …
 ```
 
@@ -474,7 +474,7 @@ nunca la sobreescriben. Puedes editar Jira directamente y el CLI respetará tu c
 
 **¿Qué pasa después del Handshake OK?**  
 El ticket pasa a estado HANDSHAKE. Ejecuta `po start-dev FP-XX` para registrar
-el sprint, el lead y las notas de arranque, y mover el ticket a EN DESARROLLO.
+los leads de desarrollo y mover el ticket a EN DESARROLLO.
 
 **¿Qué pasa si el Handshake da KO?**  
 El ticket vuelve a DEFINICION. El PO resuelve los gaps identificados por el equipo
