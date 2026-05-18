@@ -192,6 +192,11 @@ class JiraClient:
         """Assign an issue to a user by accountId."""
         self._put(f"/issue/{issue_key}/assignee", {"accountId": account_id})
 
+    def get_description_adf(self, issue_key: str) -> dict:
+        """Return the raw ADF description for an issue (used by append_section)."""
+        raw = self._get(f"/issue/{issue_key}")
+        return raw["fields"].get("description") or {"type": "doc", "version": 1, "content": []}
+
     def add_comment(self, issue_key: str, text_md: str) -> dict:
         return self._post(f"/issue/{issue_key}/comment", {"body": md_to_adf(text_md)})
 

@@ -64,12 +64,17 @@ def _build_section_header(state: str, date_str: str) -> str:
 
 
 def append_section(jira: JiraClient, issue_key: str, section_title: str, content: str) -> None:
-    """Append a markdown section to the Jira ticket description (cumulative)."""
-    issue = jira.get_issue(issue_key)
-    current_text = issue.description or ""
+    """Append a dated ADF section to the Jira ticket description without round-tripping through text."""
     date_str = datetime.now().strftime("%Y-%m-%d")
-    header = _build_section_header(section_title, date_str)
-    new_section = f"{header}\n\n{content}"
-    separator = "\n\n---\n\n"
-    full_text = (current_text + separator + new_section) if current_text.strip() else new_section
-    jira.update_issue(issue_key, {"description": md_to_adf(full_text)})
+    new_adf = md_to_adf(f"## {section_title} — {date_str}\n\n{content}")
+
+    current_adf = jira.get_description_adf(issue_key)
+    current_content = current_adf.get("content", [])
+    separator = [{"type": "rule"}] if current_content else []
+
+    combined = {
+        "type": "doc",
+        "version": 1,
+        "content": current_content + separator + new_adf.get("content", []),
+    }
+    jira.update_issue(issue_key, {"description": combined})
