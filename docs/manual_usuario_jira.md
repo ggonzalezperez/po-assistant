@@ -31,7 +31,7 @@ INTAKE → TRIAGE → DISCOVERY → DEFINICION → SIGN-OFF SH
 | **DEFINICION** | PO asignado | HU siendo redactada (con o sin IA) | `po dor-gate FP-X` |
 | **SIGN-OFF SH** | Stakeholder | Stakeholder revisa y aprueba el alcance | Confirmar en Jira → `po dor-gate FP-X` |
 | **DOR GATE** | IA + PO | Validación automática de los 12 bloques DoR | Si pasa (≥11/12 sin críticos): `po handshake FP-X` |
-| **HANDSHAKE** | PO + Tech Lead | Sesión de traspaso técnico al equipo dev | Esperar sprint → `po uat FP-X` |
+| **HANDSHAKE** | PO + Tech Lead | Sesión de traspaso técnico al equipo dev | `po start-dev FP-X` para arrancar |
 | **EN DESARROLLO** | Equipo dev | Feature en sprint | Esperar a QA/UAT → `po uat FP-X` |
 | **UAT** | Validador designado | Pruebas funcionales con datos reales | `po release FP-X` |
 | **RELEASE** | PO | Feature desplegada, pendiente confirmación negocio | Cerrar ticket en Jira |
@@ -62,6 +62,15 @@ Cada comando del CLI **añade** un bloque al final de la descripción de Jira �
 ---
 ## DEFINICION — 2026-05-21
 [HU completa]
+---
+## SIGN-OFF SH — 2026-05-22
+[documento de alcance firmado por el stakeholder]
+---
+## HANDSHAKE — 2026-05-23
+[acta de traspaso: estimación, riesgos, dependencias]
+---
+## EN DESARROLLO — 2026-05-24
+[sprint, lead, equipo, notas de arranque]
 …
 ```
 
@@ -69,7 +78,7 @@ Cada comando del CLI **añade** un bloque al final de la descripción de Jira �
 
 ## Cómo introducir respuestas en el CLI
 
-Los comandos guiados (triage, discovery, signoff, handshake, uat, release) hacen preguntas
+Los comandos guiados (triage, discovery, signoff, handshake, start-dev, uat, release) hacen preguntas
 una a una. Para cada pregunta:
 
 - **Respuesta corta** — escríbela y pulsa Enter. Después escribe `;;` y pulsa Enter para confirmar.
@@ -267,7 +276,29 @@ po handshake FP-12
    - **OK para arrancar dev** → HANDSHAKE
    - **Vuelve a Definición** (gaps) → DEFINICION
 
-**Siguiente (OK):** El equipo puede arrancar. Espera a que terminen → `po uat FP-XX`
+**Siguiente (OK):** `po start-dev FP-XX` para mover a EN DESARROLLO y dejar constancia en Jira.
+
+---
+
+### `po start-dev FP-XX`
+
+**Cuándo usarlo:** Justo después del Handshake OK, cuando el equipo va a arrancar el sprint.
+
+```bash
+po start-dev FP-12
+```
+
+**Qué hace:**
+1. Pregunta:
+   - Sprint en el que entra la HU
+   - Lead de desarrollo (nombre — rol)
+   - Resto del equipo (uno por línea)
+   - Notas de arranque (dependencias, riesgos, decisiones técnicas previas)
+2. Añade la sección `## EN DESARROLLO` a la descripción del ticket con toda esa información
+3. Mueve el ticket a estado **EN DESARROLLO**
+4. Deja un comentario con sprint, lead y el siguiente paso (`po uat`)
+
+**Siguiente:** Cuando desarrollo termine → `po uat FP-XX`
 
 ---
 
@@ -360,6 +391,8 @@ Descripción (acumulativa):
   ## DISCOVERY — 2026-05-20
   ## DEFINICION — 2026-05-21
   ## SIGN-OFF SH — 2026-05-22
+  ## HANDSHAKE — 2026-05-23
+  ## EN DESARROLLO — 2026-05-24
   …
 ```
 
@@ -383,6 +416,7 @@ Jueves — Sign-offs y Handshakes
   po signoff FP-XX                    → documento de alcance para stakeholder
   (stakeholder confirma en Jira)
   po handshake FP-XX                  → traspaso técnico al equipo dev
+  po start-dev FP-XX                  → arrancar sprint (mueve a EN DESARROLLO)
 
 Fin de sprint / Releases
   po uat FP-XX                        → registrar acta de validación UAT
@@ -442,6 +476,10 @@ No hay un número máximo de intentos.
 **¿El CLI puede sobrescribir trabajo mío en Jira?**  
 No — todos los comandos añaden secciones al final de la descripción existente,
 nunca la sobreescriben. Puedes editar Jira directamente y el CLI respetará tu contenido.
+
+**¿Qué pasa después del Handshake OK?**  
+El ticket pasa a estado HANDSHAKE. Ejecuta `po start-dev FP-XX` para registrar
+el sprint, el lead y las notas de arranque, y mover el ticket a EN DESARROLLO.
 
 **¿Qué pasa si el Handshake da KO?**  
 El ticket vuelve a DEFINICION. El PO resuelve los gaps identificados por el equipo

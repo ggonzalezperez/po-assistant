@@ -21,6 +21,7 @@ Petición bruta  →  INTAKE  →  TRIAGE  →  DISCOVERY  →  DEFINICION
 | `po dor-gate FP-12` | 6 — DoR Gate | Valida los 12 bloques del DoR, score 0-12, gaps accionables |
 | `po signoff FP-12` | 5 — Sign-off SH | Genera documento de sign-off para el stakeholder |
 | `po handshake FP-12` | 7 — Handshake | Acta de traspaso PO → desarrollo; KO devuelve a DEFINICION |
+| `po start-dev FP-12` | 8 — En Desarrollo | Formaliza el inicio: sprint, lead, equipo, notas de arranque |
 | `po uat FP-12` | 9 — UAT | Registra acta de UAT; KO devuelve a EN DESARROLLO |
 | `po release FP-12` | 10 — Release | Checklist de release y cierre del ciclo |
 | `po dashboard` | — | Pipeline Kanban con SLA alerts por estado |
@@ -126,6 +127,11 @@ po handshake FP-12
 # → Acta de traspaso: estimación, riesgos, dependencias
 # → OK → HANDSHAKE | KO (gaps) → vuelve a DEFINICION
 
+# Arrancar el desarrollo formalmente
+po start-dev FP-12
+# → Registra sprint, lead, equipo y notas de arranque
+# → Mueve a EN DESARROLLO
+
 # Registro de UAT
 po uat FP-12
 # → Acta de validación funcional
@@ -163,6 +169,7 @@ po-assistant/
 │   │   ├── dor_gate.py      # Validación 12 bloques DoR
 │   │   ├── signoff.py       # Documento de sign-off stakeholder
 │   │   ├── handshake.py     # Acta de handshake PO → dev
+│   │   ├── start_dev.py     # Arranque formal de desarrollo → EN DESARROLLO
 │   │   ├── uat.py           # Acta de UAT
 │   │   └── release.py       # Checklist de release
 │   ├── prompts/             # System prompts para Claude (.md)
@@ -217,6 +224,21 @@ completa del ticket queda visible.
 
 ## DEFINICION — 2026-05-21
 [HU completa: 6 bloques + criterios de aceptación]
+
+---
+
+## SIGN-OFF SH — 2026-05-22
+[documento de alcance firmado por el stakeholder]
+
+---
+
+## HANDSHAKE — 2026-05-23
+[acta de traspaso: estimación, riesgos, dependencias]
+
+---
+
+## EN DESARROLLO — 2026-05-24
+[sprint, lead, equipo, notas de arranque]
 …
 ```
 
