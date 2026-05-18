@@ -21,7 +21,7 @@ Petición bruta  →  INTAKE  →  TRIAGE  →  DISCOVERY  →  DEFINICION
 | `po dor-gate FP-12` | 6 — DoR Gate | Valida los 12 bloques del DoR, score 0-12, gaps accionables |
 | `po signoff FP-12` | 5 — Sign-off SH | Genera documento de sign-off para el stakeholder |
 | `po handshake FP-12` | 7 — Handshake | Acta de traspaso PO → desarrollo; KO devuelve a DEFINICION |
-| `po start-dev FP-12` | 8 — En Desarrollo | Formaliza el inicio: sprint, lead, equipo, notas de arranque |
+| `po start-dev FP-12` | 8 — En Desarrollo | Registra leads de desarrollo y mueve a EN DESARROLLO |
 | `po uat FP-12` | 9 — UAT | Registra acta de UAT; KO devuelve a EN DESARROLLO |
 | `po release FP-12` | 10 — Release | Checklist de release y cierre del ciclo |
 | `po dashboard` | — | Pipeline Kanban con SLA alerts por estado |
@@ -129,8 +129,8 @@ po handshake FP-12
 
 # Arrancar el desarrollo formalmente
 po start-dev FP-12
-# → Registra sprint, lead, equipo y notas de arranque
-# → Mueve a EN DESARROLLO
+# → Registra los leads de desarrollo
+# → Mueve a EN DESARROLLO (HU ya visible en sección DEFINICION)
 
 # Registro de UAT
 po uat FP-12

@@ -289,14 +289,9 @@ po start-dev FP-12
 ```
 
 **Qué hace:**
-1. Pregunta:
-   - Sprint en el que entra la HU
-   - Lead de desarrollo (nombre — rol)
-   - Resto del equipo (uno por línea)
-   - Notas de arranque (dependencias, riesgos, decisiones técnicas previas)
-2. Añade la sección `## EN DESARROLLO` a la descripción del ticket con toda esa información
+1. Pregunta quiénes lideran el desarrollo (nombre — rol, uno por línea)
+2. Añade la sección `## EN DESARROLLO` con los leads y un enlace a la HU (ya en la sección DEFINICION)
 3. Mueve el ticket a estado **EN DESARROLLO**
-4. Deja un comentario con sprint, lead y el siguiente paso (`po uat`)
 
 **Siguiente:** Cuando desarrollo termine → `po uat FP-XX`
 
