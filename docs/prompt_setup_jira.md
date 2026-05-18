@@ -42,49 +42,63 @@ Paso 2 — Ejecutar po setup
   - "Workflow PO ya existe" o "✓ Workflow creado"
   - Tablero Kanban creado o "ya existe"
 
-Paso 3 — Configurar columnas del tablero (via navegador si disponible)
-  Si tienes acceso a herramientas de navegador (Playwright u otras):
+Paso 3 — Configurar columnas del tablero via MCP Playwright
   
-  3a. Obtén los IDs de estado ejecutando:
-      curl -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
-        "$JIRA_BASE_URL/rest/api/3/status" \
-        | python -c "import json,sys; s=json.load(sys.stdin); [print(x['name'], x['id']) for x in s if x['name'] in ['INTAKE','TRIAGE','DISCOVERY','DEFINICION','SIGN-OFF SH','DOR GATE','HANDSHAKE','EN DESARROLLO','UAT','RELEASE']]"
+  CONTEXTO IMPORTANTE: La API pública PUT /rest/agile/1.0/board/{id}/configuration
+  devuelve 405 en Jira Cloud. Jira usa internamente el endpoint
+  PUT /rest/greenhopper/1.0/rapidviewconfig/columns (API legacy de Greenhopper),
+  que SOLO acepta autenticación por cookie de sesión, no por API token.
+  Por eso hay que ejecutarlo desde dentro de una sesión activa del navegador.
   
+  Usa las herramientas MCP Playwright siguiendo exactamente estos pasos:
+
+  3a. Obtén los IDs de estado via API (esto SÍ funciona con API token):
+      Ejecuta en terminal:
+      curl -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_BASE_URL/rest/api/3/status"
+      Filtra los 10 estados PO y anota sus IDs numéricos.
+
   3b. Obtén el ID del tablero:
       curl -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
-        "$JIRA_BASE_URL/rest/agile/1.0/board?projectKeyOrId=$JIRA_PO_PROJECT_KEY&type=kanban" \
-        | python -c "import json,sys; b=json.load(sys.stdin); print('Board ID:', b['values'][0]['id'])"
-  
-  3c. Abre en navegador: $JIRA_BASE_URL/jira/software/projects/$JIRA_PO_PROJECT_KEY/boards/<ID_BOARD>/settings/columns
-  
-  3d. Crea manualmente las 10 columnas: INTAKE, TRIAGE, DISCOVERY, DEFINICION,
-      SIGN-OFF SH, DOR GATE, HANDSHAKE, EN DESARROLLO, UAT, RELEASE
-  
-  3e. Obtén los IDs de columna inspeccionando el tráfico de red al hacer drag-and-drop
-      (F12 → Network → filtrar "rapidviewconfig")
-  
-  3f. Ejecuta en consola del navegador (estando logado en Jira):
-  
-      const STATUS = {
-        "INTAKE": "<ID>", "TRIAGE": "<ID>", "DISCOVERY": "<ID>",
-        "DEFINICION": "<ID>", "SIGN-OFF SH": "<ID>", "DOR GATE": "<ID>",
-        "HANDSHAKE": "<ID>", "EN DESARROLLO": "<ID>", "UAT": "<ID>", "RELEASE": "<ID>"
-      };
-      const COLS = {
-        "Backlog": <COL_ID>, "INTAKE": <COL_ID>, "TRIAGE": <COL_ID>,
-        "DISCOVERY": <COL_ID>, "DEFINICION": <COL_ID>, "SIGN-OFF SH": <COL_ID>,
-        "DOR GATE": <COL_ID>, "HANDSHAKE": <COL_ID>, "EN DESARROLLO": <COL_ID>,
-        "UAT": <COL_ID>, "RELEASE": <COL_ID>
-      };
+        "$JIRA_BASE_URL/rest/agile/1.0/board?projectKeyOrId=$JIRA_PO_PROJECT_KEY&type=kanban"
+      Anota el campo "id" del primer resultado.
+
+  3c. Navega a la página de configuración de columnas:
+      browser_navigate → $JIRA_BASE_URL/jira/software/projects/$JIRA_PO_PROJECT_KEY/boards/<BOARD_ID>/settings/columns
+      (Si pide login, usa browser_fill_form con las credenciales.)
+
+  3d. Crea las 10 columnas. Para cada nombre en
+      [INTAKE, TRIAGE, DISCOVERY, DEFINICION, SIGN-OFF SH, DOR GATE, HANDSHAKE, EN DESARROLLO, UAT, RELEASE]:
+      - browser_snapshot → localiza el botón "Add column" o campo de texto de nueva columna
+      - browser_click → click en "Add column"
+      - browser_type → escribe el nombre
+      - browser_press_key → Enter para confirmar
+      Repite hasta tener las 10 columnas.
+
+  3e. Obtén los IDs de columna capturando el tráfico de red:
+      - browser_network_requests → activa la captura
+      - browser_drag → arrastra cualquier estado a cualquier columna (para disparar la petición)
+      - browser_network_requests → busca la petición a "rapidviewconfig/columns"
+      - En el payload verás los IDs actuales de todas las columnas (campo "id" de cada mappedColumn)
+      Anota los IDs de columna para las 10 columnas que creaste.
+
+  3f. Llama al endpoint de configuración desde dentro de la sesión del navegador:
+      browser_evaluate → ejecuta este JavaScript (sustituye los IDs con los reales):
+
       const body = {
         currentStatisticsField: { id: "issueCount_" },
         rapidViewId: <BOARD_ID>,
         mappedColumns: [
-          { id: COLS["Backlog"], name: "Backlog", isKanPlanColumn: true, mappedStatuses: [], min: "", max: "" },
-          ...Object.entries(STATUS).map(([name, sid]) => ({
-            id: COLS[name], name, isKanPlanColumn: false,
-            mappedStatuses: [{ id: sid }], min: "", max: ""
-          }))
+          { id: <COL_BACKLOG>,     name: "Backlog",        isKanPlanColumn: true,  mappedStatuses: [], min: "", max: "" },
+          { id: <COL_INTAKE>,      name: "INTAKE",         isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_INTAKE>" }],       min: "", max: "" },
+          { id: <COL_TRIAGE>,      name: "TRIAGE",         isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_TRIAGE>" }],       min: "", max: "" },
+          { id: <COL_DISCOVERY>,   name: "DISCOVERY",      isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_DISCOVERY>" }],    min: "", max: "" },
+          { id: <COL_DEFINICION>,  name: "DEFINICION",     isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_DEFINICION>" }],   min: "", max: "" },
+          { id: <COL_SIGNOFF>,     name: "SIGN-OFF SH",    isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_SIGNOFF>" }],      min: "", max: "" },
+          { id: <COL_DOR>,         name: "DOR GATE",       isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_DOR>" }],          min: "", max: "" },
+          { id: <COL_HANDSHAKE>,   name: "HANDSHAKE",      isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_HANDSHAKE>" }],    min: "", max: "" },
+          { id: <COL_DESARROLLO>,  name: "EN DESARROLLO",  isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_DESARROLLO>" }],  min: "", max: "" },
+          { id: <COL_UAT>,         name: "UAT",            isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_UAT>" }],          min: "", max: "" },
+          { id: <COL_RELEASE>,     name: "RELEASE",        isKanPlanColumn: false, mappedStatuses: [{ id: "<STATUS_RELEASE>" }],     min: "", max: "" },
         ]
       };
       const r = await fetch('/rest/greenhopper/1.0/rapidviewconfig/columns', {
@@ -92,7 +106,13 @@ Paso 3 — Configurar columnas del tablero (via navegador si disponible)
         headers: { 'Content-Type': 'application/json', 'X-Atlassian-Token': 'no-check' },
         body: JSON.stringify(body)
       });
-      console.log(r.status, await r.json()); // debe ser 200
+      const res = await r.json();
+      `STATUS: ${r.status} — ${JSON.stringify(res).slice(0,200)}`;
+      // Resultado esperado: 200
+
+  3g. Verifica el resultado:
+      browser_navigate → $JIRA_BASE_URL/jira/software/projects/$JIRA_PO_PROJECT_KEY/boards/<BOARD_ID>
+      browser_take_screenshot → confirma que las 10 columnas están visibles con issues en INTAKE
 
 Paso 4 — Verificar
   Ejecuta: PYTHONUTF8=1 .venv/Scripts/po.exe setup
@@ -121,9 +141,13 @@ antes de continuar.
 - El prompt asume que `.env` ya está rellenado. Si no, ajusta el Paso 1 para
   guiar la creación del token y la configuración del fichero.
 - En Windows, sustituye `.venv/bin/po` por `.venv\Scripts\po.exe`.
-- El Paso 3 (columnas) requiere sesión activa en el navegador — la API
-  `PUT /rest/greenhopper/1.0/rapidviewconfig/columns` no acepta autenticación
-  Basic, solo cookies de sesión. Es la única operación que no se puede hacer
-  puramente via API token.
-- Si el agente tiene MCP Playwright disponible, puede automatizar el Paso 3
-  completo incluyendo la creación de columnas y la llamada al endpoint.
+- El Paso 3 requiere **MCP Playwright activo** en Claude Code. Sin él, el
+  tablero queda sin columnas y hay que configurarlas a mano desde el navegador
+  (ver `docs/guia_setup_jira_oficial.md` Opción B).
+- Las herramientas MCP Playwright usadas en el Paso 3 son:
+  `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`,
+  `browser_press_key`, `browser_network_requests`, `browser_evaluate`,
+  `browser_take_screenshot`.
+- El endpoint `PUT /rest/greenhopper/1.0/rapidviewconfig/columns` solo acepta
+  cookies de sesión, nunca API token. Por eso el `browser_evaluate` funciona
+  (ejecuta dentro de la sesión del navegador logado) y `curl` con API token no.

@@ -96,13 +96,50 @@ Este comando crea o verifica automáticamente:
 
 ---
 
-## Paso 3 — Configurar columnas del tablero (manual, una sola vez)
+## Paso 3 — Configurar columnas del tablero (una sola vez)
 
-Este es el único paso que **no se puede automatizar** con la API pública de Jira
-(el endpoint oficial devuelve 405 en Jira Cloud). Se hace en el navegador
-con sesión activa, o mediante el script de la siguiente sección.
+Este es el único paso que **no se puede hacer con la API pública de Jira**:
+`PUT /rest/agile/1.0/board/{id}/configuration` devuelve **405** en Jira Cloud.
 
-### Opción A — Script navegador (recomendado)
+Jira usa internamente el endpoint `PUT /rest/greenhopper/1.0/rapidviewconfig/columns`
+(API legacy de Greenhopper), que **solo acepta autenticación por cookie de sesión**,
+no por API token. Por eso se ejecuta desde dentro de una sesión activa del navegador.
+
+Hay tres formas de hacerlo, de más a menos automática:
+
+### Opción A — Claude Code con MCP Playwright (recomendado si usas IA)
+
+Esta es la forma en que se configuró el tablero del prototipo. Claude Code tiene
+acceso al plugin MCP Playwright que controla un navegador real, mantiene la sesión
+y puede llamar a la API interna de Jira.
+
+Cuando ejecutes el `prompt_setup_jira.md` con Claude Code (con el plugin Playwright
+activo), el agente hará automáticamente:
+
+1. `browser_navigate` → abre la página de configuración de columnas del tablero
+2. `browser_snapshot` → lee el estado actual de la UI
+3. Crea las columnas faltantes con `browser_type` + `browser_click` (o renombra las existentes)
+4. `browser_network_requests` → intercepta el tráfico para capturar los IDs reales
+   de columnas y estados del payload de `rapidviewconfig`
+5. `browser_evaluate` → ejecuta `fetch('PUT /rest/greenhopper/1.0/rapidviewconfig/columns', ...)`
+   dentro de la sesión del navegador, con el cuerpo correcto para mapear los 10 estados
+
+El resultado es HTTP 200 y el tablero queda configurado sin intervención humana.
+
+**Requisito:** tener el plugin MCP Playwright instalado en Claude Code.
+En el `claude_desktop_config.json` o `.claude/settings.json`:
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-playwright"]
+    }
+  }
+}
+```
+
+### Opción B — Script en consola del navegador (manual rápido)
 
 1. Abre el tablero: `https://<empresa>.atlassian.net/jira/software/projects/<CLAVE>/boards/<ID_BOARD>`
 2. Abre las DevTools del navegador (F12) → consola
