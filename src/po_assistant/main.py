@@ -358,6 +358,21 @@ def handshake(
     wf.run(issue_key, ai, jira, config)
 
 
+# ── START-DEV ─────────────────────────────────────────────────────────────────
+
+@app.command(name="start-dev")
+def start_dev(
+    issue_key: str = typer.Argument(..., help="Clave del issue (ej: FP-12)"),
+):
+    """
+    [bold]Paso 8[/bold] — Arranca el desarrollo: mueve a EN DESARROLLO y deja constancia en Jira.
+    """
+    app_header("Paso 8 — Arrancar desarrollo")
+    config, jira, _ = _clients()
+    from .workflow import start_dev as wf
+    wf.run(issue_key, jira, config)
+
+
 # ── UAT ───────────────────────────────────────────────────────────────────────
 
 @app.command()

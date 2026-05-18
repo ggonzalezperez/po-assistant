@@ -99,11 +99,11 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
             f"## Handshake OK\n\n"
             f"Estimación: {estimacion}\n\n"
             f"**El equipo puede arrancar desarrollo.**\n\n"
-            f"Siguiente: `po uat {issue_key}` (cuando dev termine)"
+            f"Siguiente: `po start-dev {issue_key}` para mover a EN DESARROLLO"
         )
         notify_success(
             f"Acta de Handshake guardada en {issue_key}. Estado → HANDSHAKE.",
-            "El equipo puede arrancar desarrollo.",
+            f"Siguiente: po start-dev {issue_key}",
         )
     else:
         jira.transition_po_state(issue_key, POEstado.DEFINICION)
