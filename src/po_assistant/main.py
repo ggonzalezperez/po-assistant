@@ -281,6 +281,21 @@ def triage(
     wf.run(issue_key, ai, jira, config)
 
 
+# ── DISCOVERY ────────────────────────────────────────────────────────────────
+
+@app.command()
+def discovery(
+    issue_key: str = typer.Argument(..., help="Clave del issue (ej: FP-12)"),
+):
+    """
+    [bold]Paso 3[/bold] — Q&A guiado para completar la Ficha Previa de Análisis.
+    """
+    app_header("Paso 3 — Discovery")
+    config, jira, ai = _clients()
+    from .workflow import discovery as wf
+    wf.run(issue_key, ai, jira, config)
+
+
 # ── DEFINE ───────────────────────────────────────────────────────────────────
 
 @app.command()
