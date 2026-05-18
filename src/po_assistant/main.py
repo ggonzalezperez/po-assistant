@@ -328,6 +328,66 @@ def dor_gate(
     wf.run(issue_key, ai, jira, config)
 
 
+# ── SIGN-OFF SH ───────────────────────────────────────────────────────────────
+
+@app.command()
+def signoff(
+    issue_key: str = typer.Argument(..., help="Clave del issue (ej: FP-12)"),
+):
+    """
+    [bold]Paso 5[/bold] — Genera el documento de Sign-off del alcance con el stakeholder.
+    """
+    app_header("Paso 5 — Sign-off Stakeholder")
+    config, jira, ai = _clients()
+    from .workflow import signoff as wf
+    wf.run(issue_key, ai, jira, config)
+
+
+# ── HANDSHAKE ─────────────────────────────────────────────────────────────────
+
+@app.command()
+def handshake(
+    issue_key: str = typer.Argument(..., help="Clave del issue (ej: FP-12)"),
+):
+    """
+    [bold]Paso 7[/bold] — Genera el Acta de Handshake PO ↔ Desarrollo.
+    """
+    app_header("Paso 7 — Handshake")
+    config, jira, ai = _clients()
+    from .workflow import handshake as wf
+    wf.run(issue_key, ai, jira, config)
+
+
+# ── UAT ───────────────────────────────────────────────────────────────────────
+
+@app.command()
+def uat(
+    issue_key: str = typer.Argument(..., help="Clave del issue (ej: FP-12)"),
+):
+    """
+    [bold]Paso 9[/bold] — Registra el Acta de UAT con el validador funcional.
+    """
+    app_header("Paso 9 — UAT")
+    config, jira, ai = _clients()
+    from .workflow import uat as wf
+    wf.run(issue_key, ai, jira, config)
+
+
+# ── RELEASE ───────────────────────────────────────────────────────────────────
+
+@app.command()
+def release(
+    issue_key: str = typer.Argument(..., help="Clave del issue (ej: FP-12)"),
+):
+    """
+    [bold]Paso 10[/bold] — Completa el Checklist de Release y autoriza la entrada a producción.
+    """
+    app_header("Paso 10 — Release")
+    config, jira, ai = _clients()
+    from .workflow import release as wf
+    wf.run(issue_key, ai, jira, config)
+
+
 # ── DASHBOARD ────────────────────────────────────────────────────────────────
 
 @app.command()
