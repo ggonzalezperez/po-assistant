@@ -5,7 +5,7 @@ import typer
 from ..ai_client import AIClient
 from ..config import Config
 from ..display import (
-    console, section_rule, notify_success, confirm,
+    console, section_rule, notify_success, notify_warning, confirm,
     C_MUTED, C_ACCENT, C_PRIMARY,
 )
 from ..jira_client import JiraClient
@@ -106,6 +106,14 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
 
     if choice == 4:
         jira.transition_po_state(issue_key, POEstado.TRIAGE)
+        account_id = jira.find_user_by_name(answers["asignado_a"])
+        if account_id:
+            jira.assign_issue(issue_key, account_id)
+        else:
+            notify_warning(
+                f"No se encontró '{answers['asignado_a']}' en Jira.",
+                "Asigna el ticket manualmente desde el navegador.",
+            )
     elif choice == 5:
         jira.transition_po_state(issue_key, POEstado.APLAZADO)
     else:

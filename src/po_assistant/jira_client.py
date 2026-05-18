@@ -178,6 +178,20 @@ class JiraClient:
         labels.append(new_estado.value)
         self.update_labels(issue_key, labels)
 
+    def find_user_by_name(self, query: str) -> str | None:
+        """Search Jira users by display name or email. Returns accountId or None."""
+        try:
+            results = self._get("/user/search", params={"query": query, "maxResults": 5})
+            if results:
+                return results[0]["accountId"]
+        except JiraError:
+            pass
+        return None
+
+    def assign_issue(self, issue_key: str, account_id: str) -> None:
+        """Assign an issue to a user by accountId."""
+        self._put(f"/issue/{issue_key}/assignee", {"accountId": account_id})
+
     def add_comment(self, issue_key: str, text_md: str) -> dict:
         return self._post(f"/issue/{issue_key}/comment", {"body": md_to_adf(text_md)})
 

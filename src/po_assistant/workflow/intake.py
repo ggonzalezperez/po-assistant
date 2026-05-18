@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import typer
 
 from ..ai_client import AIClient
@@ -78,13 +80,15 @@ def run(text: str, ai: AIClient, jira: JiraClient, config: Config) -> str:
 
 
 def _build_description(result: IntakeResult, original_text: str) -> str:
+    date_str = datetime.now().strftime("%Y-%m-%d")
     lines = [
-        "## Petición original",
+        f"## INTAKE — {date_str}",
+        "",
+        "**Petición original:**",
         original_text,
         "",
         "---",
         "",
-        "## Análisis IA",
         f"**Tipo de petición:** {result.tipo_peticion.value}",
         f"**Prioridad sugerida:** {result.prioridad_sugerida}",
         f"**Justificación:** {result.razon_prioridad}",
@@ -96,9 +100,4 @@ def _build_description(result: IntakeResult, original_text: str) -> str:
         lines += ["", "**Preguntas para el PO (resolver en discovery):**"]
         for d in result.dudas_para_el_po:
             lines.append(f"- {d}")
-    lines += [
-        "",
-        "---",
-        "_Creado con po-assistant · Siguiente: `po triage <KEY>`_",
-    ]
     return "\n".join(lines)
