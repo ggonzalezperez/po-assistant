@@ -453,6 +453,47 @@ class JiraClient:
 
 # ── ADF helpers ──────────────────────────────────────────────────────────────
 
+def _is_table_separator(row: str) -> bool:
+    cells = [c.strip() for c in row.split("|") if c.strip()]
+    return bool(cells) and all(re.match(r"^:?-+:?$", c) for c in cells)
+
+
+def _parse_table_row(row: str) -> list[str]:
+    cells = row.split("|")
+    if cells and not cells[0].strip():
+        cells = cells[1:]
+    if cells and not cells[-1].strip():
+        cells = cells[:-1]
+    return [c.strip() for c in cells]
+
+
+def _make_adf_table(table_lines: list[str]) -> dict:
+    rows: list[dict] = []
+    header_done = False
+    for row in table_lines:
+        if _is_table_separator(row):
+            header_done = True
+            continue
+        cells = _parse_table_row(row)
+        cell_type = "tableCell" if header_done else "tableHeader"
+        rows.append({
+            "type": "tableRow",
+            "content": [
+                {
+                    "type": cell_type,
+                    "attrs": {},
+                    "content": [{"type": "paragraph", "content": _inline(cell)}],
+                }
+                for cell in cells
+            ],
+        })
+    return {
+        "type": "table",
+        "attrs": {"isNumberColumnEnabled": False, "layout": "default"},
+        "content": rows,
+    }
+
+
 def md_to_adf(text: str) -> dict:
     """Convert simplified markdown to Atlassian Document Format (ADF)."""
     content: list[dict] = []
@@ -483,18 +524,46 @@ def md_to_adf(text: str) -> dict:
                 "content": [{"type": "text", "text": "\n".join(code_lines)}],
             })
 
+        # Markdown table — collect all consecutive | lines
+        elif line.startswith("|"):
+            flush_bullets()
+            table_lines: list[str] = []
+            while i < len(lines) and lines[i].startswith("|"):
+                table_lines.append(lines[i])
+                i += 1
+            content.append(_make_adf_table(table_lines))
+            continue  # i already advanced past the table
+
+        # Headings — check longest prefix first to avoid partial matches
+        elif line.startswith("##### "):
+            flush_bullets()
+            content.append({
+                "type": "heading", "attrs": {"level": 5},
+                "content": [{"type": "text", "text": line[6:].strip()}],
+            })
+        elif line.startswith("#### "):
+            flush_bullets()
+            content.append({
+                "type": "heading", "attrs": {"level": 4},
+                "content": [{"type": "text", "text": line[5:].strip()}],
+            })
+        elif line.startswith("### "):
+            flush_bullets()
+            content.append({
+                "type": "heading", "attrs": {"level": 3},
+                "content": [{"type": "text", "text": line[4:].strip()}],
+            })
         elif line.startswith("## "):
             flush_bullets()
             content.append({
                 "type": "heading", "attrs": {"level": 2},
                 "content": [{"type": "text", "text": line[3:].strip()}],
             })
-
-        elif line.startswith("### "):
+        elif line.startswith("# "):
             flush_bullets()
             content.append({
-                "type": "heading", "attrs": {"level": 3},
-                "content": [{"type": "text", "text": line[4:].strip()}],
+                "type": "heading", "attrs": {"level": 1},
+                "content": [{"type": "text", "text": line[2:].strip()}],
             })
 
         elif line.startswith("- "):
