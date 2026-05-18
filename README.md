@@ -1,98 +1,111 @@
 # po-assistant
 
-> Asistente IA para Product Owners — Flexicar
-> Automatiza el flujo end-to-end en Jira con Claude API.
+> Asistente IA para Product Owners — Flexicar  
+> Automatiza el flujo end-to-end de definición de HUs con Claude + Jira.
 
 ---
 
 ## Qué hace
 
-| Comando | Paso del flujo | Qué hace la IA |
-|---|---|---|
-| `po setup` | — | Crea el proyecto FP en Jira y los campos custom |
-| `po intake "texto"` | Paso 1 — Intake | Clasifica la petición y crea el ticket en Jira |
-| `po define FP-12` | Paso 4 — Definición | Genera la HU completa (6 bloques) a partir del discovery |
-| `po dor-gate FP-12` | Paso 6 — DoR Gate | Valida los 12 bloques del DoR, da score y lista los gaps |
-| `po dashboard` | — | Muestra el pipeline completo por estado |
-| `po demo` | — | Demo guiada con un caso real de Flexicar (para el CTO) |
+```
+Petición bruta  →  INTAKE  →  TRIAGE  →  DISCOVERY  →  DEFINICION
+    →  SIGN-OFF SH  →  DOR GATE  →  HANDSHAKE  →  EN DESARROLLO  →  UAT  →  RELEASE
+```
+
+| Comando | Paso | Qué hace la IA |
+|---------|------|----------------|
+| `po intake "texto"` | 1 — Intake | Clasifica tipo y prioridad, redacta descripción estructurada, crea ticket en Jira |
+| `po define FP-12` | 4 — Definición | Genera HU completa (6 bloques + criterios de aceptación) |
+| `po dor-gate FP-12` | 6 — DoR Gate | Valida los 12 bloques del DoR, score 0-12, lista gaps accionables |
+| `po dashboard` | — | Pipeline Kanban con SLA alerts por estado |
+| `po setup` | — | Configura proyecto Jira, campos custom, workflow y tablero |
+| `po demo` | — | Demo guiada con caso real Flexicar (INTAKE→DEFINICIÓN→DOR GATE) |
 
 ---
 
-## Setup rápido (5 minutos)
+## Instalación rápida
 
-### 1. Prerrequisitos
+### Prerrequisitos
 
-- Python 3.12+
-- Cuenta Jira Cloud (gratuita o de pago)
-- API Key de Anthropic (console.anthropic.com)
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (gestor de paquetes) — o pip
+- Cuenta Jira Cloud con permisos de administrador
+- API Key de Anthropic — [console.anthropic.com](https://console.anthropic.com/settings/keys)
 
-### 2. Instalar
+### Instalar
 
 ```bash
-# Clonar el repo
 git clone https://github.com/ggonzalezperez/po-assistant.git
 cd po-assistant
 
-# Crear entorno virtual
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Mac/Linux
+# Con uv (recomendado)
+uv sync
 
-# Instalar dependencias
+# Con pip
+python -m venv .venv
+.venv\Scripts\activate   # Windows
 pip install -e .
 ```
 
-### 3. Configurar
+### Configurar
 
 ```bash
 cp .env.example .env
-# Edita .env con tu editor y rellena:
-# - JIRA_BASE_URL  (ej: https://gerx97.atlassian.net)
-# - JIRA_EMAIL     (tu email de Atlassian)
-# - JIRA_API_TOKEN (desde https://id.atlassian.com/manage-profile/security/api-tokens)
-# - ANTHROPIC_API_KEY (desde https://console.anthropic.com/settings/keys)
 ```
 
-### 4. Crear el proyecto en Jira
+Edita `.env` con los valores reales:
+
+```dotenv
+JIRA_BASE_URL=https://<dominio>.atlassian.net
+JIRA_EMAIL=<tu-email>@flexicar.es
+JIRA_API_TOKEN=<token de id.atlassian.com>
+ANTHROPIC_API_KEY=<sk-ant-api03-...>
+JIRA_PO_PROJECT_KEY=FP
+PO_TEAM=Ester Carrasco:ecarrasco@flexicar.es,...
+PYTHONUTF8=1
+```
+
+### Inicializar Jira
 
 ```bash
 po setup
 ```
 
-Sigue las instrucciones en pantalla. Si hay problemas, consulta [JIRA_SETUP.md](JIRA_SETUP.md).
+Crea o verifica: proyecto, 5 campos custom, workflow de 10 estados, tablero Kanban y componentes del equipo.
+Los IDs de campos se escriben automáticamente en `.env`.
 
-### 5. Probar
+Para el paso adicional de configurar las columnas del tablero, consulta
+[`docs/guia_setup_jira_oficial.md`](docs/guia_setup_jira_oficial.md).
+
+### Probar
 
 ```bash
-# Demo completa (recomendado para ver el flujo)
-po demo
-
-# O paso a paso:
-po intake "Los agentes de tienda no encuentran cómo cancelar una reserva en el CRM"
-po define FP-1
-po dor-gate FP-1
-po dashboard
+po demo               # demo guiada con caso real (~2 min)
+po demo --offline     # sin crear issues en Jira
 ```
 
 ---
 
-## Uso avanzado
+## Uso diario
 
 ```bash
-# Generar HU desde un archivo de notas de discovery
-po define FP-12 --notes notas_reunion.txt
+# Nueva petición recibida
+po intake "Los agentes no encuentran cómo cancelar una reserva en el CRM"
+# → Crea FP-12 en INTAKE con clasificación IA
 
-# Dashboard filtrado por PO
-po dashboard --po ester
+# Tras el discovery, generar HU
+po define FP-12
+po define FP-12 --notes notas_reunion.txt  # con notas de la reunión
 
-# Dashboard con issues cerrados
-po dashboard --all
+# Validar si la HU está lista para desarrollo
+po dor-gate FP-12
+# → Score 11/12 OK → pasa a DOR GATE
+# → Score 8/12 KO  → vuelve a DEFINICION con gaps detallados
 
-# Demo sin crear issues en Jira
-po demo --offline
-
-# Modo dry-run (simula sin escribir en Jira)
-DRY_RUN=true po intake "Prueba sin crear issue"
+# Revisar el pipeline
+po dashboard
+po dashboard --po ester   # filtrar por PO
+po dashboard --all        # incluir cerrados
 ```
 
 ---
@@ -102,78 +115,98 @@ DRY_RUN=true po intake "Prueba sin crear issue"
 ```
 po-assistant/
 ├── src/po_assistant/
-│   ├── main.py              # CLI — comandos typer
-│   ├── config.py            # Config desde .env
-│   ├── jira_client.py       # Jira REST API v3
+│   ├── main.py              # CLI — comandos Typer
+│   ├── config.py            # Configuración desde .env
+│   ├── jira_client.py       # Jira REST API v3 + Agile API
 │   ├── ai_client.py         # Anthropic SDK (Claude)
-│   ├── models.py            # Tipos: POEstado, DorGateResult, etc.
+│   ├── models.py            # Tipos: POEstado, DorGateResult…
+│   ├── display.py           # UI terminal con Rich
 │   ├── workflow/
 │   │   ├── intake.py        # Clasificación + creación de issue
-│   │   ├── definition.py    # Borrador HU completo
-│   │   └── dor_gate.py      # Linter de 12 bloques DoR
-│   ├── prompts/             # System prompts para Claude (archivos .md)
+│   │   ├── definition.py    # Generación HU 6 bloques
+│   │   └── dor_gate.py      # Validación 12 bloques DoR
+│   ├── prompts/             # System prompts para Claude (.md)
 │   │   ├── intake_classify.md
 │   │   ├── definition_draft_hu.md
 │   │   └── dor_validate.md
 │   └── templates/
-│       └── hu_template.md   # Plantilla de HU (referencia)
+│       └── hu_template.md   # Plantilla de referencia
+├── docs/
+│   ├── guia_setup_jira_oficial.md   # Setup Jira corporativo paso a paso
+│   ├── prompt_setup_jira.md         # Prompt IA para automatizar el setup
+│   └── manual_usuario_jira.md       # Manual de uso diario para POs
 ├── tests/
 │   └── test_dor_gate.py
+├── JIRA_SETUP.md            # Referencia rápida de configuración Jira
 ├── .env.example
-├── JIRA_SETUP.md            # Guía de configuración Jira
 └── pyproject.toml
 ```
 
 ---
 
-## Entornos: prototipo vs Flexicar
+## Configuración Jira — resumen técnico
 
-```bash
-# Prototipo (tu Jira personal)
-cp .env.example .env
-# → edita con datos de gerx97.atlassian.net
+`po setup` configura automáticamente:
 
-# Producción Flexicar
-cp .env.example .env.flexicar
-# → edita con datos de flexicar.atlassian.net
-# → para usar: edita .env con los datos de .env.flexicar
-```
+| Qué | API usada |
+|-----|-----------|
+| Proyecto Kanban | `POST /rest/api/3/project` |
+| 10 estados globales (INTAKE → RELEASE) | `POST /rest/api/3/statuses` |
+| Workflow con transiciones globales | `POST /rest/api/3/workflows/create` |
+| Asignación workflow al proyecto | `PUT /rest/api/2/workflowscheme/{id}/draft` |
+| 5 campos custom (DoR Score, DoR Gaps…) | `POST /rest/api/3/field` |
+| Tablero Kanban + filtros rápidos | `POST /rest/agile/1.0/board` |
+| Componentes del equipo PO | `POST /rest/api/3/component` |
+
+Las columnas del tablero requieren un paso manual (ver
+[`docs/guia_setup_jira_oficial.md`](docs/guia_setup_jira_oficial.md)) porque
+la API pública de Jira Free devuelve 405 en ese endpoint. Se usan las DevTools
+del navegador con el API interno de Greenhopper.
 
 ---
 
-## Checklists vivas
+## Entornos
 
-Los prompts de IA y las checklists del flujo se cargan desde archivos `.md` del repositorio
-de documentación (`DOCS_PATH` en `.env`). Si se actualiza `14_Checklist_Maestra.md`
-o el DoR, el tool usa la versión actualizada automáticamente en la siguiente ejecución.
+```bash
+# Prototipo personal
+cp .env.example .env
+# → JIRA_BASE_URL=https://gerx97.atlassian.net
+
+# Producción Flexicar
+cp .env.example .env
+# → JIRA_BASE_URL=https://flexicar.atlassian.net
+# → JIRA_PO_PROJECT_KEY=<CLAVE_CORPORATIVA>
+```
 
 ---
 
 ## Tests
 
 ```bash
-pip install -e ".[dev]"   # instala pytest
-pytest tests/ -v
+uv run pytest tests/ -v
+# o: pip install -e ".[dev]" && pytest tests/ -v
 ```
+
+---
+
+## Documentación
+
+| Documento | Contenido |
+|-----------|-----------|
+| [`docs/guia_setup_jira_oficial.md`](docs/guia_setup_jira_oficial.md) | Guía completa para configurar el Jira corporativo |
+| [`docs/prompt_setup_jira.md`](docs/prompt_setup_jira.md) | Prompt para que una IA ejecute el setup automáticamente |
+| [`docs/manual_usuario_jira.md`](docs/manual_usuario_jira.md) | Manual de uso diario para Product Owners |
+| [`JIRA_SETUP.md`](JIRA_SETUP.md) | Referencia rápida de campos, estados y troubleshooting |
 
 ---
 
 ## Roadmap
 
-- [ ] `po triage FP-X` — árbol de decisión asistido
-- [ ] `po discovery FP-X` — checklist guiada de discovery
+- [ ] `po triage FP-X` — árbol de decisión asistido para el Comité
+- [ ] `po discovery FP-X` — checklist guiada de discovery con IA
 - [ ] `po signoff FP-X` — email de sign-off para stakeholder
-- [ ] `po handshake FP-X` — agenda para la sesión con dev + crea issue FI
+- [ ] `po handshake FP-X` — agenda de traspaso técnico + crea issue en DEV
 - [ ] `po uat FP-X` — paquete de validación UAT
 - [ ] `po urgencia "texto"` — flujo abreviado para urgencias
-- [ ] `po audit --week` — auditoría DoR semanal (10 issues aleatorios)
+- [ ] `po audit --week` — auditoría DoR semanal automatizada
 - [ ] Integración con `flexicar-po-dashboard` (M7/M8)
-
----
-
-## Documentación relacionada
-
-- `04_Flujo_End_to_End_PO.md` — flujo de los 10 pasos
-- `05_DoR_y_Plantilla_HU.md` — DoR v1 y plantilla de HU
-- `11_KPIs_Cuadro_Mando.md` — KPIs que este tool ayuda a medir
-- `14_Checklist_Maestra.md` — checklists de cada paso
