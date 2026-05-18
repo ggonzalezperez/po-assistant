@@ -5,7 +5,7 @@ import typer
 from ..ai_client import AIClient
 from ..config import Config
 from ..display import (
-    console, section_rule, notify_success, notify_warning, confirm,
+    console, section_rule, notify_success, confirm,
     C_MUTED, C_ACCENT, C_PRIMARY,
 )
 from ..jira_client import JiraClient
