@@ -12,14 +12,20 @@ Petición bruta  →  INTAKE  →  TRIAGE  →  DISCOVERY  →  DEFINICION
     →  SIGN-OFF SH  →  DOR GATE  →  HANDSHAKE  →  EN DESARROLLO  →  UAT  →  RELEASE
 ```
 
-| Comando | Paso | Qué hace la IA |
-|---------|------|----------------|
-| `po intake "texto"` | 1 — Intake | Clasifica tipo y prioridad, redacta descripción estructurada, crea ticket en Jira |
+| Comando | Paso | Qué hace |
+|---------|------|----------|
+| `po intake "texto"` | 1 — Intake | Clasifica tipo y prioridad con IA, crea ticket en Jira |
+| `po triage FP-12` | 2 — Triage | Árbol de decisión asistido: avanza, aplaza, redirige o rechaza |
+| `po discovery FP-12` | 3 — Discovery | Genera ficha de discovery guiada por preguntas del PO |
 | `po define FP-12` | 4 — Definición | Genera HU completa (6 bloques + criterios de aceptación) |
-| `po dor-gate FP-12` | 6 — DoR Gate | Valida los 12 bloques del DoR, score 0-12, lista gaps accionables |
+| `po dor-gate FP-12` | 6 — DoR Gate | Valida los 12 bloques del DoR, score 0-12, gaps accionables |
+| `po signoff FP-12` | 5 — Sign-off SH | Genera documento de sign-off para el stakeholder |
+| `po handshake FP-12` | 7 — Handshake | Acta de traspaso PO → desarrollo; KO devuelve a DEFINICION |
+| `po uat FP-12` | 9 — UAT | Registra acta de UAT; KO devuelve a EN DESARROLLO |
+| `po release FP-12` | 10 — Release | Checklist de release y cierre del ciclo |
 | `po dashboard` | — | Pipeline Kanban con SLA alerts por estado |
 | `po setup` | — | Configura proyecto Jira, campos custom, workflow y tablero |
-| `po demo` | — | Demo guiada con caso real Flexicar (INTAKE→DEFINICIÓN→DOR GATE) |
+| `po demo` | — | Demo guiada con caso real Flexicar |
 
 ---
 
@@ -93,6 +99,15 @@ po demo --offline     # sin crear issues en Jira
 po intake "Los agentes no encuentran cómo cancelar una reserva en el CRM"
 # → Crea FP-12 en INTAKE con clasificación IA
 
+# Comité de Triage — decidir qué avanza
+po triage FP-12
+# → 5 opciones: redirigir, urgencia, devolver, discovery, aplazar
+# → Transitions: discovery → TRIAGE | aplazar → APLAZADO | resto → RECHAZADO
+
+# Discovery con el stakeholder — ficha guiada
+po discovery FP-12
+# → 11 preguntas guiadas; genera ficha de contexto en Jira
+
 # Tras el discovery, generar HU
 po define FP-12
 po define FP-12 --notes notas_reunion.txt  # con notas de la reunión
@@ -101,6 +116,24 @@ po define FP-12 --notes notas_reunion.txt  # con notas de la reunión
 po dor-gate FP-12
 # → Score 11/12 OK → pasa a DOR GATE
 # → Score 8/12 KO  → vuelve a DEFINICION con gaps detallados
+
+# Sign-off del stakeholder — documento formal de alcance
+po signoff FP-12
+# → Genera documento de sign-off; stakeholder confirma en Jira
+
+# Handshake con el equipo de desarrollo
+po handshake FP-12
+# → Acta de traspaso: estimación, riesgos, dependencias
+# → OK → HANDSHAKE | KO (gaps) → vuelve a DEFINICION
+
+# Registro de UAT
+po uat FP-12
+# → Acta de validación funcional
+# → OK/condicional → UAT | KO → vuelve a EN DESARROLLO
+
+# Release y cierre del ciclo
+po release FP-12
+# → Checklist de release; transitions a RELEASE
 
 # Revisar el pipeline
 po dashboard
@@ -122,13 +155,26 @@ po-assistant/
 │   ├── models.py            # Tipos: POEstado, DorGateResult…
 │   ├── display.py           # UI terminal con Rich
 │   ├── workflow/
+│   │   ├── qa.py            # Q&A helpers compartidos (ask, append_section…)
 │   │   ├── intake.py        # Clasificación + creación de issue
+│   │   ├── triage.py        # Árbol de decisión de triage
+│   │   ├── discovery.py     # Ficha de discovery guiada
 │   │   ├── definition.py    # Generación HU 6 bloques
-│   │   └── dor_gate.py      # Validación 12 bloques DoR
+│   │   ├── dor_gate.py      # Validación 12 bloques DoR
+│   │   ├── signoff.py       # Documento de sign-off stakeholder
+│   │   ├── handshake.py     # Acta de handshake PO → dev
+│   │   ├── uat.py           # Acta de UAT
+│   │   └── release.py       # Checklist de release
 │   ├── prompts/             # System prompts para Claude (.md)
 │   │   ├── intake_classify.md
+│   │   ├── triage_decide.md
+│   │   ├── discovery_ficha.md
 │   │   ├── definition_draft_hu.md
-│   │   └── dor_validate.md
+│   │   ├── dor_validate.md
+│   │   ├── signoff_doc.md
+│   │   ├── handshake_acta.md
+│   │   ├── uat_acta.md
+│   │   └── release_check.md
 │   └── templates/
 │       └── hu_template.md   # Plantilla de referencia
 ├── docs/
@@ -136,10 +182,42 @@ po-assistant/
 │   ├── prompt_setup_jira.md         # Prompt IA para automatizar el setup
 │   └── manual_usuario_jira.md       # Manual de uso diario para POs
 ├── tests/
+│   ├── test_qa_helpers.py
+│   ├── test_triage.py
+│   ├── test_discovery.py
 │   └── test_dor_gate.py
 ├── JIRA_SETUP.md            # Referencia rápida de configuración Jira
 ├── .env.example
 └── pyproject.toml
+```
+
+---
+
+## Cómo funciona internamente — descripción acumulativa
+
+Cada comando añade un bloque `## ESTADO — YYYY-MM-DD` a la descripción del ticket
+en Jira, separado por `---`. La descripción nunca se sobreescribe: la historia
+completa del ticket queda visible.
+
+```
+## INTAKE — 2026-05-18
+[análisis IA de la petición original]
+
+---
+
+## TRIAGE — 2026-05-19
+[decisión del comité + justificación]
+
+---
+
+## DISCOVERY — 2026-05-20
+[ficha de contexto, stakeholders, viabilidad]
+
+---
+
+## DEFINICION — 2026-05-21
+[HU completa: 6 bloques + criterios de aceptación]
+…
 ```
 
 ---
@@ -202,11 +280,6 @@ uv run pytest tests/ -v
 
 ## Roadmap
 
-- [ ] `po triage FP-X` — árbol de decisión asistido para el Comité
-- [ ] `po discovery FP-X` — checklist guiada de discovery con IA
-- [ ] `po signoff FP-X` — email de sign-off para stakeholder
-- [ ] `po handshake FP-X` — agenda de traspaso técnico + crea issue en DEV
-- [ ] `po uat FP-X` — paquete de validación UAT
-- [ ] `po urgencia "texto"` — flujo abreviado para urgencias
+- [ ] `po urgencia "texto"` — flujo abreviado para urgencias en producción
 - [ ] `po audit --week` — auditoría DoR semanal automatizada
 - [ ] Integración con `flexicar-po-dashboard` (M7/M8)
