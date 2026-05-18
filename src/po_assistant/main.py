@@ -266,6 +266,21 @@ def intake(
     wf.run(text, ai, jira, config)
 
 
+# ── TRIAGE ───────────────────────────────────────────────────────────────────
+
+@app.command()
+def triage(
+    issue_key: str = typer.Argument(..., help="Clave del issue (ej: FP-12)"),
+):
+    """
+    [bold]Paso 2[/bold] — Árbol de decisión de triage con comentario documentado.
+    """
+    app_header("Paso 2 — Triage")
+    config, jira, ai = _clients()
+    from .workflow import triage as wf
+    wf.run(issue_key, ai, jira, config)
+
+
 # ── DEFINE ───────────────────────────────────────────────────────────────────
 
 @app.command()
