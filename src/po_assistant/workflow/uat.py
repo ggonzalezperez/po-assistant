@@ -78,9 +78,9 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
         raise typer.Abort()
 
     append_section(jira, issue_key, "UAT", acta_md)
-    jira.transition_po_state(issue_key, POEstado.UAT)
 
     if decision == 1:
+        jira.transition_po_state(issue_key, POEstado.UAT)
         jira.add_comment(issue_key,
             f"## UAT OK ✅\n\nValidador: **{validador}**\n\n"
             f"Siguiente: `po release {issue_key}`")
@@ -89,11 +89,13 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
             f"Siguiente: [{C_ACCENT}]po release {issue_key}[/{C_ACCENT}]",
         )
     elif decision == 2:
+        jira.transition_po_state(issue_key, POEstado.EN_DESARROLLO)
         jira.add_comment(issue_key,
             f"## UAT KO ❌\n\nDefectos: {defectos}\n\n"
             f"La HU vuelve a desarrollo. Lead FE/BE a cargo de la corrección.")
         notify_warning(f"UAT KO — la HU vuelve a desarrollo.", f"Defectos: {defectos}")
     else:
+        jira.transition_po_state(issue_key, POEstado.UAT)
         jira.add_comment(issue_key,
             f"## UAT OK condicional ⚠️\n\nObservaciones: {observaciones}\n\n"
             f"Siguiente: `po release {issue_key}`")

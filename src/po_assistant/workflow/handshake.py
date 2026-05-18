@@ -6,7 +6,7 @@ from ..ai_client import AIClient
 from ..config import Config
 from ..display import (
     console, section_rule, notify_success, notify_warning, confirm,
-    C_MUTED, C_ACCENT,
+    C_MUTED,
 )
 from ..jira_client import JiraClient
 from ..models import POEstado
@@ -91,9 +91,9 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
         raise typer.Abort()
 
     append_section(jira, issue_key, "HANDSHAKE", acta_md)
-    jira.transition_po_state(issue_key, POEstado.HANDSHAKE)
 
     if decision == 1:
+        jira.transition_po_state(issue_key, POEstado.HANDSHAKE)
         jira.add_comment(
             issue_key,
             f"## Handshake OK\n\n"
@@ -106,6 +106,7 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
             "El equipo puede arrancar desarrollo.",
         )
     else:
+        jira.transition_po_state(issue_key, POEstado.DEFINICION)
         jira.add_comment(
             issue_key,
             f"## Handshake KO\n\nGaps identificados:\n{gaps_def}\n\n"
