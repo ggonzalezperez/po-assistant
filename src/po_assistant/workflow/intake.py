@@ -1,36 +1,23 @@
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 import typer
 
 from ..ai_client import AIClient
 from ..config import Config
+from ..display import (
+    console, section_rule, intake_card, notify_success,
+    notify_warning, confirm, C_MUTED, C_ACCENT, ICON_ARROW,
+)
 from ..jira_client import JiraClient
 from ..models import IntakeResult, POEstado, TipoPeticion
-
-console = Console()
-
-PRIORITY_COLOR = {"Alta": "red", "Media": "yellow", "Baja": "green"}
-TYPE_ICON = {
-    "problema": "🔴",
-    "idea": "💡",
-    "urgencia": "🚨",
-    "mejora": "🔧",
-    "incidencia": "⚠️",
-}
 
 
 def run(text: str, ai: AIClient, jira: JiraClient, config: Config) -> str:
     """
-    Classifies a free-text request with IA, shows a preview, confirms with the PO,
-    and creates the Jira issue. Returns the created issue key.
+    Classifies a free-text request with IA, shows a structured preview,
+    confirms with the PO, creates the Jira issue. Returns the issue key.
     """
-    console.print("\n[bold]Analizando petición con IA…[/bold]")
+    section_rule("Analizando petición con IA")
 
-    data = ai.call_json(
-        "intake_classify.md",
-        {"USER_INPUT": text},
-    )
+    data = ai.call_json("intake_classify.md", {"USER_INPUT": text})
 
     result = IntakeResult(
         titulo=data["titulo"],
@@ -42,22 +29,31 @@ def run(text: str, ai: AIClient, jira: JiraClient, config: Config) -> str:
         dudas_para_el_po=data.get("dudas_para_el_po", []),
     )
 
-    _display_intake_result(result)
+    intake_card(
+        titulo=result.titulo,
+        tipo=result.tipo_peticion.value,
+        prioridad=result.prioridad_sugerida,
+        descripcion=result.descripcion,
+        razon_prioridad=result.razon_prioridad,
+        dudas=result.dudas_para_el_po,
+    )
 
     if result.alerta_urgencia:
-        console.print(Panel(
-            "⚠️  La IA ha detectado que esto puede ser una [bold red]URGENCIA[/bold red].\n"
-            "Si es así, usa [bold]po urgencia[/bold] para el flujo abreviado.",
-            title="Alerta", border_style="yellow"
-        ))
+        notify_warning(
+            "La IA detecta posible urgencia.",
+            f"Si es así, usa [{C_ACCENT}]po urgencia[/{C_ACCENT}] para el flujo abreviado.",
+        )
 
-    if not typer.confirm("\n¿Crear este ticket en Jira?", default=True):
-        console.print("[yellow]Cancelado.[/yellow]")
+    if not confirm("¿Crear este ticket en Jira?", default=True):
+        console.print(f"  [{C_MUTED}]Cancelado.[/{C_MUTED}]\n")
         raise typer.Abort()
 
     description = _build_description(result, text)
-    labels = [POEstado.INTAKE.value, f"tipo:{result.tipo_peticion.value}",
-              f"prio:{result.prioridad_sugerida.lower()}"]
+    labels = [
+        POEstado.INTAKE.value,
+        f"tipo:{result.tipo_peticion.value}",
+        f"prio:{result.prioridad_sugerida.lower()}",
+    ]
 
     issue = jira.create_issue(
         summary=result.titulo,
@@ -68,56 +64,41 @@ def run(text: str, ai: AIClient, jira: JiraClient, config: Config) -> str:
 
     key = issue.get("key", "FP-DRY")
     jira_url = f"{config.jira_base_url}/browse/{key}"
-    console.print(f"\n[bold green]✅ Ticket creado: {key}[/bold green]")
-    console.print(f"[link={jira_url}]{jira_url}[/link]\n")
 
-    if result.dudas_para_el_po:
-        console.print("[bold yellow]⚡ Preguntas abiertas para el PO:[/bold yellow]")
-        for i, duda in enumerate(result.dudas_para_el_po, 1):
-            console.print(f"  {i}. {duda}")
-        console.print()
+    notify_success(
+        f"Ticket creado: {key}",
+        f"[link={jira_url}]{jira_url}[/link]",
+    )
 
+    console.print(
+        f"  [{C_MUTED}]Siguiente paso:[/{C_MUTED}]  "
+        f"[bold {C_ACCENT}]po define {key}[/bold {C_ACCENT}]\n"
+    )
     return key
-
-
-def _display_intake_result(result: IntakeResult) -> None:
-    table = Table(show_header=False, box=None, padding=(0, 1))
-    table.add_column(style="dim", width=22)
-    table.add_column()
-
-    icon = TYPE_ICON.get(result.tipo_peticion.value, "")
-    color = PRIORITY_COLOR.get(result.prioridad_sugerida, "white")
-
-    table.add_row("Título", f"[bold]{result.titulo}[/bold]")
-    table.add_row("Tipo", f"{icon} {result.tipo_peticion.value}")
-    table.add_row("Prioridad", f"[{color}]{result.prioridad_sugerida}[/{color}] — {result.razon_prioridad}")
-    table.add_row("Descripción", result.descripcion)
-
-    console.print(Panel(table, title="[bold]Resultado del análisis IA[/bold]", border_style="blue"))
 
 
 def _build_description(result: IntakeResult, original_text: str) -> str:
     lines = [
-        f"## Petición original",
-        f"{original_text}",
+        "## Petición original",
+        original_text,
         "",
         "---",
         "",
-        f"## Análisis IA",
+        "## Análisis IA",
         f"**Tipo de petición:** {result.tipo_peticion.value}",
         f"**Prioridad sugerida:** {result.prioridad_sugerida}",
         f"**Justificación:** {result.razon_prioridad}",
         "",
-        f"**Descripción estructurada:**",
+        "**Descripción estructurada:**",
         result.descripcion,
     ]
     if result.dudas_para_el_po:
-        lines += ["", "**Dudas para el PO (a resolver en discovery):**"]
+        lines += ["", "**Preguntas para el PO (resolver en discovery):"]
         for d in result.dudas_para_el_po:
             lines.append(f"- {d}")
     lines += [
         "",
         "---",
-        "_Ticket creado con po-assistant. Siguiente paso: `po triage <KEY>`_",
+        "_Creado con po-assistant · Siguiente: `po define <KEY>`_",
     ]
     return "\n".join(lines)
