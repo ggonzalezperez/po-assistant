@@ -17,7 +17,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-console = Console()
+console = Console(force_terminal=True)
 
 # ── Design tokens ────────────────────────────────────────────────────────────
 

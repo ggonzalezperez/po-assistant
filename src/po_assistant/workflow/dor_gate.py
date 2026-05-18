@@ -67,7 +67,10 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> DorGa
         )
         extra_fields[config.fields.dor_gaps] = gaps[:255]
     if extra_fields:
-        jira.update_issue(issue_key, extra_fields)
+        try:
+            jira.update_issue(issue_key, extra_fields)
+        except Exception:
+            pass  # custom fields not on screen in Jira Free — non-blocking
 
     if result.pasa:
         jira.transition_po_state(issue_key, POEstado.DOR_GATE)

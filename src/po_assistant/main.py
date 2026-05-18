@@ -112,23 +112,30 @@ def setup():
         ("Tipo Peticion",  "text",   "problema|idea|urgencia|mejora|incidencia"),
         ("Validador UAT",  "text",   "Nombre y rol del validador funcional de UAT"),
     ]
+    # Resolve existing fields first (idempotency: skip creation if already present)
+    all_fields = jira.get_all_fields()
+    existing_by_name: dict[str, str] = {}
+    for f in all_fields:
+        fname = f.get("name", "")
+        if fname not in existing_by_name:
+            existing_by_name[fname] = f["id"]
+
     created: dict[str, str] = {}
     for name, ftype, desc in fields_spec:
-        try:
-            result = jira.create_number_field(name, desc) if ftype == "number" \
-                else jira.create_text_field(name, desc)
-            fid = result.get("id", "?")
-            created[name] = fid
-            console.print(f"  [{C_SUCCESS}]✓[/{C_SUCCESS}] {name:<22} [{C_MUTED}]{fid}[/{C_MUTED}]")
-        except JiraError as e:
-            console.print(f"  [{C_MUTED}]— {name:<22} ya existe o error: {e}[/{C_MUTED}]")
-
-    if not created:
-        all_fields = jira.get_all_fields()
-        for f in all_fields:
-            for name, _, _ in fields_spec:
-                if f.get("name") == name:
-                    created[name] = f["id"]
+        if name in existing_by_name:
+            created[name] = existing_by_name[name]
+            console.print(
+                f"  [{C_MUTED}]— {name:<22} ya existe  {existing_by_name[name]}[/{C_MUTED}]"
+            )
+        else:
+            try:
+                result = jira.create_number_field(name, desc) if ftype == "number" \
+                    else jira.create_text_field(name, desc)
+                fid = result.get("id", "?")
+                created[name] = fid
+                console.print(f"  [{C_SUCCESS}]✓[/{C_SUCCESS}] {name:<22} [{C_MUTED}]{fid}[/{C_MUTED}]")
+            except JiraError as e:
+                console.print(f"  [{C_MUTED}]— {name:<22} error: {e}[/{C_MUTED}]")
 
     env_map = {
         "DoR Score":     "JIRA_FIELD_DOR_SCORE",
@@ -142,8 +149,45 @@ def setup():
         fid = created.get(name, "customfield_XXXXX")
         console.print(f"  {env_key}={fid}")
 
+    # ── Tablero Kanban ────────────────────────────────────────────────────────
+    section_rule("Tablero Kanban")
+    board_id = jira.get_board(key)
+    if board_id:
+        console.print(f"  [{C_MUTED}]— Tablero Kanban ya existe  (ID: {board_id})[/{C_MUTED}]")
+    else:
+        try:
+            board_id = jira.create_board(f"Pipeline PO — {key}", key)
+            for estado in ESTADO_ORDER:
+                jira.create_quick_filter(board_id, estado.display, f"labels = \"{estado.value}\"")
+            console.print(
+                f"  [{C_SUCCESS}]✓[/{C_SUCCESS}] Tablero Kanban creado   "
+                f"[{C_MUTED}]ID: {board_id}[/{C_MUTED}]"
+            )
+            console.print(
+                f"  [{C_MUTED}]  Filtros rápidos: {len(ESTADO_ORDER)} estados del flujo PO[/{C_MUTED}]"
+            )
+        except JiraError as e:
+            board_id = 0
+            console.print(f"  [{C_MUTED}]— Tablero: {e}[/{C_MUTED}]")
+
+    # ── Equipo PO — Componentes ───────────────────────────────────────────────
+    if config.po_team:
+        section_rule("Equipo PO — Componentes")
+        for po_name, po_email in config.po_team.items():
+            try:
+                jira.create_component(key, po_name, po_email)
+                console.print(
+                    f"  [{C_SUCCESS}]✓[/{C_SUCCESS}] {po_name:<26} [{C_MUTED}]{po_email}[/{C_MUTED}]"
+                )
+            except JiraError:
+                console.print(f"  [{C_MUTED}]— {po_name:<26} ya existe[/{C_MUTED}]")
+
     console.print()
-    board_url = f"{config.jira_base_url}/jira/software/projects/{key}/boards"
+    board_url = (
+        f"{config.jira_base_url}/jira/software/projects/{key}/boards/{board_id}"
+        if board_id else
+        f"{config.jira_base_url}/jira/software/projects/{key}/boards"
+    )
     notify_success("Setup completado.", f"[link={board_url}]Abrir tablero →[/link]")
     console.print()
 

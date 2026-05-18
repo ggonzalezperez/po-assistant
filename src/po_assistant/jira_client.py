@@ -114,6 +114,20 @@ class JiraClient:
 
     # ── Issues ───────────────────────────────────────────────────────────────
 
+    def _resolve_issue_type(self, preferred: str) -> dict:
+        """Return issuetype field value: use preferred name if available, else first type."""
+        try:
+            types = self._get(f"/issue/createmeta/{self.config.jira_po_project_key}/issuetypes")
+            available = types.get("issueTypes", [])
+            for t in available:
+                if t.get("name", "").lower() == preferred.lower():
+                    return {"id": t["id"]}
+            if available:
+                return {"id": available[0]["id"]}
+        except JiraError:
+            pass
+        return {"name": preferred}
+
     def create_issue(
         self,
         summary: str,
@@ -126,7 +140,7 @@ class JiraClient:
             "project": {"key": self.config.jira_po_project_key},
             "summary": summary,
             "description": md_to_adf(description_md),
-            "issuetype": {"name": issue_type},
+            "issuetype": self._resolve_issue_type(issue_type),
         }
         if labels:
             fields["labels"] = labels
@@ -176,6 +190,76 @@ class JiraClient:
     def get_project_issues(self) -> list[JiraIssue]:
         jql = f"project = {self.config.jira_po_project_key} ORDER BY created DESC"
         return self.search_issues(jql)
+
+    # ── Agile (Boards) ───────────────────────────────────────────────────────
+
+    def _get_agile(self, path: str, params: dict | None = None) -> dict:
+        resp = requests.get(
+            f"{self.base}/rest/agile/1.0{path}",
+            auth=self.auth, headers=self.headers, params=params, timeout=30,
+        )
+        self._raise(resp)
+        return resp.json()
+
+    def _post_agile(self, path: str, data: dict) -> dict:
+        if self.dry_run:
+            console.print(f"[dim][DRY_RUN] POST agile{path}[/dim]")
+            return {"id": 0}
+        resp = requests.post(
+            f"{self.base}/rest/agile/1.0{path}",
+            auth=self.auth, headers=self.headers,
+            data=json.dumps(data), timeout=30,
+        )
+        self._raise(resp)
+        return resp.json() if resp.text else {}
+
+    def get_board(self, project_key: str) -> int:
+        """Return ID of first Kanban board for the project, or 0 if none."""
+        try:
+            data = self._get_agile("/board", {"projectKeyOrId": project_key, "type": "kanban"})
+            values = data.get("values", [])
+            if values:
+                return int(values[0]["id"])
+        except JiraError:
+            pass
+        return 0
+
+    def create_filter(self, name: str, jql: str) -> str:
+        """Create a saved JQL filter. Returns filter ID."""
+        data = self._post("/filter", {
+            "name": name,
+            "jql": jql,
+            "favourite": False,
+        })
+        return str(data.get("id", ""))
+
+    def create_board(self, name: str, project_key: str) -> int:
+        """Create a Kanban board backed by a saved filter. Returns board ID."""
+        filter_id = self.create_filter(
+            name,
+            f"project = {project_key} ORDER BY created DESC",
+        )
+        data = self._post_agile("/board", {
+            "name": name,
+            "type": "kanban",
+            "filterId": filter_id,
+        })
+        return int(data.get("id", 0))
+
+    def create_quick_filter(self, board_id: int, name: str, query: str) -> None:
+        """Add a quick filter to a board (best-effort)."""
+        try:
+            self._post_agile(f"/board/{board_id}/quickfilter", {"name": name, "query": query})
+        except JiraError:
+            pass
+
+    def create_component(self, project_key: str, name: str, description: str = "") -> dict:
+        """Create a project component (used as PO team labels)."""
+        return self._post("/component", {
+            "name": name,
+            "description": description,
+            "project": project_key,
+        })
 
 
 # ── ADF helpers ──────────────────────────────────────────────────────────────
