@@ -1,11 +1,13 @@
 """po-assistant — CLI para Product Owners · Flexicar"""
 
+import os
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
 import typer
+from dotenv import find_dotenv, set_key
 from rich.padding import Padding
 
 from .config import load_config
@@ -106,27 +108,39 @@ def setup():
 
     section_rule("Campos custom")
     fields_spec = [
-        ("DoR Score",      "number", "Score 0-12 del DoR Gate automático"),
-        ("DoR Gaps",       "text",   "Gaps detectados por el linter DoR"),
-        ("IA Asistida",    "text",   "Si/No"),
-        ("Tipo Peticion",  "text",   "problema|idea|urgencia|mejora|incidencia"),
-        ("Validador UAT",  "text",   "Nombre y rol del validador funcional de UAT"),
+        ("DoR Score",      "number", "Score 0-12 del DoR Gate automático",      config.fields.dor_score),
+        ("DoR Gaps",       "text",   "Gaps detectados por el linter DoR",        config.fields.dor_gaps),
+        ("IA Asistida",    "text",   "Si/No",                                    config.fields.ia_asistida),
+        ("Tipo Peticion",  "text",   "problema|idea|urgencia|mejora|incidencia", config.fields.tipo_peticion),
+        ("Validador UAT",  "text",   "Nombre y rol del validador funcional de UAT", config.fields.validador_uat),
     ]
-    # Resolve existing fields first (idempotency: skip creation if already present)
-    all_fields = jira.get_all_fields()
-    existing_by_name: dict[str, str] = {}
-    for f in all_fields:
-        fname = f.get("name", "")
-        if fname not in existing_by_name:
-            existing_by_name[fname] = f["id"]
+    env_map = {
+        "DoR Score":     "JIRA_FIELD_DOR_SCORE",
+        "DoR Gaps":      "JIRA_FIELD_DOR_GAPS",
+        "IA Asistida":   "JIRA_FIELD_IA_ASISTIDA",
+        "Tipo Peticion": "JIRA_FIELD_TIPO_PETICION",
+        "Validador UAT": "JIRA_FIELD_VALIDADOR_UAT",
+    }
+
+    # Skip Jira lookup entirely if all IDs are already in .env
+    all_preconfigured = all(existing_id for _, _, _, existing_id in fields_spec)
+    if all_preconfigured:
+        existing_lower: dict[str, str] = {}
+    else:
+        jira_fields = jira.get_all_fields()
+        existing_lower = {f.get("name", "").lower(): f["id"] for f in jira_fields}
 
     created: dict[str, str] = {}
-    for name, ftype, desc in fields_spec:
-        if name in existing_by_name:
-            created[name] = existing_by_name[name]
-            console.print(
-                f"  [{C_MUTED}]— {name:<22} ya existe  {existing_by_name[name]}[/{C_MUTED}]"
-            )
+    for name, ftype, desc, env_id in fields_spec:
+        if env_id:
+            # Already set in .env — nothing to do
+            created[name] = env_id
+            console.print(f"  [{C_MUTED}]— {name:<22} ya configurado  {env_id}[/{C_MUTED}]")
+        elif name.lower() in existing_lower:
+            # Exists in Jira but missing from .env (e.g. after manual field creation)
+            fid = existing_lower[name.lower()]
+            created[name] = fid
+            console.print(f"  [{C_MUTED}]— {name:<22} ya existe  {fid}[/{C_MUTED}]")
         else:
             try:
                 result = jira.create_number_field(name, desc) if ftype == "number" \
@@ -137,17 +151,27 @@ def setup():
             except JiraError as e:
                 console.print(f"  [{C_MUTED}]— {name:<22} error: {e}[/{C_MUTED}]")
 
-    env_map = {
-        "DoR Score":     "JIRA_FIELD_DOR_SCORE",
-        "DoR Gaps":      "JIRA_FIELD_DOR_GAPS",
-        "IA Asistida":   "JIRA_FIELD_IA_ASISTIDA",
-        "Tipo Peticion": "JIRA_FIELD_TIPO_PETICION",
-        "Validador UAT": "JIRA_FIELD_VALIDADOR_UAT",
-    }
-    section_rule("Añade esto a tu .env")
+    # Auto-update .env so IDs persist without manual copy-paste
+    dotenv_path = find_dotenv(usecwd=True) or ""
+    env_updated = False
     for name, env_key in env_map.items():
-        fid = created.get(name, "customfield_XXXXX")
-        console.print(f"  {env_key}={fid}")
+        fid = created.get(name, "")
+        if fid and fid != "?" and os.getenv(env_key, "") != fid:
+            if dotenv_path:
+                set_key(dotenv_path, env_key, fid)
+            env_updated = True
+
+    if env_updated:
+        section_rule(".env actualizado automáticamente")
+        for name, env_key in env_map.items():
+            fid = created.get(name, "")
+            if fid:
+                console.print(f"  [{C_SUCCESS}]✓[/{C_SUCCESS}] {env_key}={fid}")
+    else:
+        section_rule("Campos custom — IDs")
+        for name, env_key in env_map.items():
+            fid = created.get(name, "")
+            console.print(f"  [{C_MUTED}]{env_key}={fid or '—'}[/{C_MUTED}]")
 
     # ── Workflow Kanban con 10 estados ────────────────────────────────────────
     section_rule("Workflow PO — 10 estados")

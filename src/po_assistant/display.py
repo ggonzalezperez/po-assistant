@@ -456,8 +456,14 @@ def _wrap(text: str, width: int) -> list[str]:
 
 
 def confirm(prompt: str, default: bool = True) -> bool:
-    """Styled confirmation prompt."""
+    """Styled confirmation prompt. Accepts s/y (yes) or n (no), both languages."""
     import typer
-    default_hint = f"[{C_MUTED}][{'S/n' if default else 's/N'}][/{C_MUTED}]"
-    console.print(f"  [{C_ACCENT}]{ICON_ARROW}[/{C_ACCENT}] {prompt} {default_hint} ", end="")
-    return typer.confirm("", default=default)
+    hint = "S/n" if default else "s/N"
+    console.print(f"  [{C_ACCENT}]{ICON_ARROW}[/{C_ACCENT}] {prompt} [{C_MUTED}][{hint}][/{C_MUTED}]: ", end="")
+    try:
+        answer = input().strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        raise typer.Abort()
+    if not answer:
+        return default
+    return answer in ("s", "si", "sí", "y", "yes")

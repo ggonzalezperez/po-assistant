@@ -201,8 +201,12 @@ class JiraClient:
         )
 
     def search_issues(self, jql: str, max_results: int = 100) -> list[JiraIssue]:
-        data = self._get("/search", params={"jql": jql, "maxResults": max_results})
-        return [self.get_issue(i["key"]) for i in data.get("issues", [])]
+        data = self._get("/search/jql", params={
+            "jql": jql,
+            "maxResults": max_results,
+            "fields": "summary,status,labels,assignee,created,updated,description",
+        })
+        return [self.get_issue(i.get("key") or i["id"]) for i in data.get("issues", [])]
 
     def get_project_issues(self) -> list[JiraIssue]:
         jql = f"project = {self.config.jira_po_project_key} ORDER BY created DESC"
