@@ -58,9 +58,17 @@ def test_append_section_date_in_header():
     assert "2026-05-20" in adf_text
 
 
-def test_ask_multiline_joins_lines_until_blank():
-    inputs = iter(["línea uno", "línea dos", ""])
+def test_ask_multiline_joins_lines_until_terminator():
+    inputs = iter(["línea uno", "línea dos", ";;"])
     with patch("builtins.input", side_effect=lambda: next(inputs)):
         with patch("po_assistant.workflow.qa.console"):
             result = ask_multiline("¿Cuéntame?")
     assert result == "línea uno\nlínea dos"
+
+
+def test_ask_multiline_allows_blank_lines_within_input():
+    inputs = iter(["párrafo uno", "", "párrafo dos", ";;"])
+    with patch("builtins.input", side_effect=lambda: next(inputs)):
+        with patch("po_assistant.workflow.qa.console"):
+            result = ask_multiline("¿Cuéntame?")
+    assert result == "párrafo uno\n\npárrafo dos"

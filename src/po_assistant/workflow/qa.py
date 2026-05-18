@@ -8,37 +8,32 @@ from ..display import console, C_ACCENT, C_MUTED, C_PRIMARY
 from ..jira_client import JiraClient, md_to_adf
 
 
+_DONE = ";;"
+
+
 def ask(question: str, hint: str = "") -> str:
-    """Display a question and return the PO's one-line answer."""
+    """Collect a single or multiline answer. Type ;; on its own line to finish."""
     console.print()
     console.print(f"  [{C_PRIMARY}]{question}[/{C_PRIMARY}]")
     if hint:
         console.print(f"  [{C_MUTED}]{hint}[/{C_MUTED}]")
-    console.print(f"  [{C_ACCENT}]→[/{C_ACCENT}] ", end="")
-    try:
-        return input().strip()
-    except (EOFError, KeyboardInterrupt):
-        raise typer.Abort()
-
-
-def ask_multiline(question: str, hint: str = "") -> str:
-    """Display a question expecting multiline input; blank line ends input."""
-    console.print()
-    console.print(f"  [{C_PRIMARY}]{question}[/{C_PRIMARY}]")
-    if hint:
-        console.print(f"  [{C_MUTED}]{hint}[/{C_MUTED}]")
-    console.print(f"  [{C_MUTED}](línea en blanco para terminar)[/{C_MUTED}]")
+    console.print(f"  [{C_MUTED}](;; en línea nueva para terminar)[/{C_MUTED}]")
     lines: list[str] = []
     while True:
-        console.print(f"  [{C_ACCENT}]·[/{C_ACCENT}] ", end="")
+        console.print(f"  [{C_ACCENT}]→[/{C_ACCENT}] ", end="")
         try:
             line = input()
         except (EOFError, KeyboardInterrupt):
             break
-        if not line.strip():
+        if line.strip() == _DONE:
             break
         lines.append(line)
-    return "\n".join(lines)
+    return "\n".join(lines).strip()
+
+
+def ask_multiline(question: str, hint: str = "") -> str:
+    """Alias for ask(). Kept for semantic clarity in workflow code."""
+    return ask(question, hint)
 
 
 def ask_choice(question: str, options: list[tuple[str, str]]) -> int:
