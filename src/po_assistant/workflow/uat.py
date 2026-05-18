@@ -91,7 +91,7 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
     elif decision == 2:
         jira.transition_po_state(issue_key, POEstado.EN_DESARROLLO)
         jira.add_comment(issue_key,
-            f"## UAT KO ❌\n\nDefectos: {defectos}\n\n"
+            f"## UAT KO ❌\n\nDefectos: {defectos}\n\nObservaciones:\n{observaciones}\n\n"
             f"La HU vuelve a desarrollo. Lead FE/BE a cargo de la corrección.")
         notify_warning(f"UAT KO — la HU vuelve a desarrollo.", f"Defectos: {defectos}")
     else:

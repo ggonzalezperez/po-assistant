@@ -93,7 +93,7 @@ def _build_description(result: IntakeResult, original_text: str) -> str:
         result.descripcion,
     ]
     if result.dudas_para_el_po:
-        lines += ["", "**Preguntas para el PO (resolver en discovery):"]
+        lines += ["", "**Preguntas para el PO (resolver en discovery):**"]
         for d in result.dudas_para_el_po:
             lines.append(f"- {d}")
     lines += [

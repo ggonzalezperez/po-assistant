@@ -108,6 +108,8 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
         jira.transition_po_state(issue_key, POEstado.TRIAGE)
     elif choice == 5:
         jira.transition_po_state(issue_key, POEstado.APLAZADO)
+    else:
+        jira.transition_po_state(issue_key, POEstado.RECHAZADO)
 
     jira.add_comment(issue_key, f"**Triage completado** — {_decision_label(choice)}\n\n_{fecha}_")
 
