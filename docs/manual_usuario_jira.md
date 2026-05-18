@@ -67,6 +67,29 @@ Cada comando del CLI **añade** un bloque al final de la descripción de Jira �
 
 ---
 
+## Cómo introducir respuestas en el CLI
+
+Los comandos guiados (triage, discovery, signoff, handshake, uat, release) hacen preguntas
+una a una. Para cada pregunta:
+
+- **Respuesta corta** — escríbela y pulsa Enter. Después escribe `;;` y pulsa Enter para confirmar.
+- **Respuesta larga o pegada** — pega el texto (puede tener saltos de línea, listas, párrafos en blanco). Cuando hayas terminado, escribe `;;` en una nueva línea y pulsa Enter.
+
+```
+¿Cuál es el problema real detrás de esta petición?
+  (;; en línea nueva para terminar)
+→ Flexicar necesita ganar autonomía técnica sobre la Intranet
+→ antes del traspaso de Minery. El equipo no conoce la arquitectura.
+→
+→ La tarea de onboarding cubre solo el uso básico, no el desarrollo.
+→ ;;
+```
+
+El `;;` es el único terminador — funciona igual para respuestas cortas y largas,
+y permite pegar texto con líneas en blanco sin que el CLI avance a la siguiente pregunta.
+
+---
+
 ## Cómo usar el CLI `po` — comandos del día a día
 
 ### `po intake "descripción"`
@@ -439,3 +462,9 @@ Para trabajo real necesitas conexión a Jira y a la API de Anthropic.
 No. Todos los prompts tienen la regla explícita "NO inventes". Cuando falta
 información, la IA deja `[PENDIENTE: ...]` en lugar de inventar. El PO siempre
 aporta el conocimiento; la IA solo estructura y mejora la forma.
+
+**¿Puedo pegar texto largo o con saltos de línea en las preguntas del CLI?**  
+Sí. Todos los comandos guiados usan `;;` como terminador de respuesta. Pega el
+texto que quieras (con párrafos, listas, Markdown), y cuando hayas terminado
+escribe `;;` en una línea nueva y pulsa Enter. Ver la sección
+[Cómo introducir respuestas en el CLI](#cómo-introducir-respuestas-en-el-cli).
