@@ -31,3 +31,8 @@ def test_extract_intake_text_short_passthrough():
     short_text = "Petición corta."
     result = _extract_intake_text(short_text)
     assert result == short_text
+
+
+def test_build_answers_text_missing_fields_show_placeholder():
+    result = _build_answers_text({})
+    assert result.count("[sin respuesta]") == 11

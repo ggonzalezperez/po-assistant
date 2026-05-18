@@ -34,7 +34,7 @@ def _build_answers_text(answers: dict) -> str:
     ]
     lines = []
     for label, key in fields:
-        value = answers.get(key, "").strip()
+        value = (answers.get(key) or "").strip()
         lines.append(f"{label}: {value if value else '[sin respuesta]'}")
     return "\n".join(lines)
 
@@ -137,8 +137,9 @@ def run(issue_key: str, ai: AIClient, jira: JiraClient, config: Config) -> None:
     if not confirm("¿Guardar la ficha previa en Jira?", default=True):
         filename = f"{issue_key}-ficha-previa.md"
         Path(filename).write_text(ficha_md, encoding="utf-8")
-        console.print(f"  [{C_MUTED}]Guardado localmente en {filename}[/{C_MUTED}]\n")
-        raise typer.Abort()
+        abs_path = Path(filename).resolve()
+        console.print(f"  [{C_MUTED}]Guardado localmente en {abs_path}[/{C_MUTED}]\n")
+        raise typer.Exit(0)
 
     append_section(jira, issue_key, "DISCOVERY — Ficha Previa", ficha_md)
     jira.transition_po_state(issue_key, POEstado.DISCOVERY)
