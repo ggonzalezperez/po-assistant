@@ -8,8 +8,9 @@ from ..display import (
     console, section_rule, hu_preview, notify_success, notify_warning,
     confirm, C_MUTED, C_ACCENT, C_WARNING,
 )
-from ..jira_client import JiraClient, md_to_adf
+from ..jira_client import JiraClient
 from ..models import POEstado
+from .qa import append_section
 
 
 def run(
@@ -68,7 +69,7 @@ def run(
         _offer_local_save(issue_key, hu_text)
         raise typer.Abort()
 
-    jira.update_issue(issue_key, {"description": md_to_adf(hu_text)})
+    append_section(jira, issue_key, "DEFINICION", hu_text)
     jira.transition_po_state(issue_key, POEstado.DEFINICION)
 
     comment = (

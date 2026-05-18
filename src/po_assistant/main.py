@@ -461,8 +461,9 @@ def dashboard(
 
     _help_row([
         ("po intake \"texto\"", "crear ticket"),
+        ("po triage FP-X", "clasificar en triage"),
+        ("po discovery FP-X", "ficha de discovery"),
         ("po define FP-X", "generar HU"),
-        ("po dor-gate FP-X", "validar DoR"),
     ])
     console.print()
 

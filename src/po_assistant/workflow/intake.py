@@ -72,7 +72,7 @@ def run(text: str, ai: AIClient, jira: JiraClient, config: Config) -> str:
 
     console.print(
         f"  [{C_MUTED}]Siguiente paso:[/{C_MUTED}]  "
-        f"[bold {C_ACCENT}]po define {key}[/bold {C_ACCENT}]\n"
+        f"[bold {C_ACCENT}]po triage {key}[/bold {C_ACCENT}]\n"
     )
     return key
 
@@ -99,6 +99,6 @@ def _build_description(result: IntakeResult, original_text: str) -> str:
     lines += [
         "",
         "---",
-        "_Creado con po-assistant · Siguiente: `po define <KEY>`_",
+        "_Creado con po-assistant · Siguiente: `po triage <KEY>`_",
     ]
     return "\n".join(lines)
