@@ -154,10 +154,27 @@ class JiraClient:
     def update_labels(self, issue_key: str, new_labels: list[str]) -> None:
         self._put(f"/issue/{issue_key}", {"fields": {"labels": new_labels}})
 
+    def get_transitions(self, issue_key: str) -> list[dict]:
+        """Return available workflow transitions for an issue."""
+        return self._get(f"/issue/{issue_key}/transitions").get("transitions", [])
+
+    def apply_transition(self, issue_key: str, transition_name: str) -> bool:
+        """Apply a transition by name. Returns True if applied."""
+        if self.dry_run:
+            return True
+        for t in self.get_transitions(issue_key):
+            if t.get("to", {}).get("name", "").upper() == transition_name.upper():
+                self._post(f"/issue/{issue_key}/transitions", {"transition": {"id": t["id"]}})
+                return True
+        return False
+
     def transition_po_state(self, issue_key: str, new_estado: POEstado) -> None:
-        """Replace any existing po-* label with the new state label."""
+        """Transition issue to new PO state via Jira workflow + update label."""
+        # Real Jira status transition (works when PO workflow is active)
+        self.apply_transition(issue_key, new_estado.display)
+        # Also sync po-* label (used by CLI dashboard and quick filters)
         issue = self.get_issue(issue_key)
-        labels = [l for l in issue.labels if not l.startswith("po-")]
+        labels = [lbl for lbl in issue.labels if not lbl.startswith("po-")]
         labels.append(new_estado.value)
         self.update_labels(issue_key, labels)
 
@@ -260,6 +277,160 @@ class JiraClient:
             "description": description,
             "project": project_key,
         })
+
+    # ── Workflow setup ───────────────────────────────────────────────────────
+
+    _PO_STATUSES = [
+        ("INTAKE",        "TODO"),
+        ("TRIAGE",        "TODO"),
+        ("DISCOVERY",     "IN_PROGRESS"),
+        ("DEFINICION",    "IN_PROGRESS"),
+        ("SIGN-OFF SH",   "IN_PROGRESS"),
+        ("DOR GATE",      "IN_PROGRESS"),
+        ("HANDSHAKE",     "IN_PROGRESS"),
+        ("EN DESARROLLO", "IN_PROGRESS"),
+        ("UAT",           "IN_PROGRESS"),
+        ("RELEASE",       "DONE"),
+    ]
+
+    def get_or_create_po_statuses(self) -> dict[str, str]:
+        """Ensure the 10 PO statuses exist globally. Returns {name: id}."""
+        try:
+            all_statuses = self._get("/status")   # GET /rest/api/3/status
+            existing = {s["name"]: s["id"] for s in all_statuses}
+        except JiraError:
+            existing = {}
+
+        to_create = [
+            {"name": n, "statusCategory": cat, "description": ""}
+            for n, cat in self._PO_STATUSES
+            if n not in existing
+        ]
+        if to_create:
+            created = self._post("/statuses", {   # POST /rest/api/3/statuses
+                "statuses": to_create,
+                "scope": {"type": "GLOBAL"},
+            })
+            for s in (created if isinstance(created, list) else []):
+                existing[s["name"]] = s["id"]
+
+        return {n: existing[n] for n, _ in self._PO_STATUSES if n in existing}
+
+    def get_project_scheme_id(self, project_id: str) -> int:
+        """Return the workflow scheme ID for a project."""
+        resp = requests.get(
+            f"{self.base}/rest/api/2/workflowscheme/project",
+            auth=self.auth, headers=self.headers,
+            params={"projectId": project_id}, timeout=30,
+        )
+        self._raise(resp)
+        values = resp.json().get("values", [])
+        if values:
+            return int(values[0]["workflowScheme"]["id"])
+        raise JiraError("Workflow scheme not found for project")
+
+    def po_workflow_exists(self) -> bool:
+        """Check whether PO Workflow — Flexicar already exists."""
+        try:
+            resp = requests.get(
+                f"{self.base}/rest/api/3/workflows/search",
+                auth=self.auth, headers=self.headers,
+                params={"queryString": "PO Workflow"}, timeout=30,
+            )
+            if resp.ok:
+                for wf in resp.json().get("values", []):
+                    if "PO Workflow" in wf.get("name", ""):
+                        return True
+        except Exception:
+            pass
+        return False
+
+    def create_po_workflow(self, status_ids: dict[str, str]) -> str:
+        """Create the PO workflow with 10 statuses and global transitions. Returns workflow name."""
+        statuses_list = [
+            {"statusReference": status_ids[n], "layout": {"x": float(i * 160), "y": 0.0}, "properties": {}}
+            for i, (n, _) in enumerate(self._PO_STATUSES)
+        ]
+        top_statuses = [
+            {"id": status_ids[n], "name": n, "statusCategory": cat,
+             "statusReference": status_ids[n], "description": "", "scope": {"type": "GLOBAL"}}
+            for n, cat in self._PO_STATUSES
+        ]
+        transitions = [
+            {"id": "1", "name": "Crear", "description": "", "toStatusReference": status_ids["INTAKE"],
+             "type": "INITIAL", "links": [], "actions": [], "validators": [], "triggers": [], "properties": {}}
+        ]
+        for i, (name, _) in enumerate(self._PO_STATUSES):
+            transitions.append({
+                "id": str(10 + i * 10), "name": name, "description": "",
+                "toStatusReference": status_ids[name], "type": "GLOBAL",
+                "links": [], "actions": [], "validators": [], "triggers": [], "properties": {}
+            })
+
+        resp = requests.post(
+            f"{self.base}/rest/api/3/workflows/create",
+            auth=self.auth, headers=self.headers,
+            json={
+                "scope": {"type": "GLOBAL"},
+                "statuses": top_statuses,
+                "workflows": [{
+                    "name": "PO Workflow — Flexicar",
+                    "description": "Flujo 10 estados Product Owner — Flexicar",
+                    "startPointLayout": {"x": -100.0, "y": -153.0},
+                    "statuses": statuses_list,
+                    "transitions": transitions,
+                }]
+            },
+            timeout=30
+        )
+        self._raise(resp)
+        return "PO Workflow — Flexicar"
+
+    def assign_workflow_to_project(self, scheme_id: int, workflow_name: str,
+                                   old_status_ids: list[str], new_status_ids: dict[str, str]) -> str:
+        """Update workflow scheme draft and publish it. Returns task ID."""
+        # Update draft (creates one if it doesn't exist)
+        requests.put(
+            f"{self.base}/rest/api/2/workflowscheme/{scheme_id}/draft",
+            auth=self.auth, headers=self.headers,
+            json={"defaultWorkflow": workflow_name, "issueTypeMappings": {}},
+            timeout=30
+        )
+        # Build status migration mappings
+        migration = []
+        default_new = list(new_status_ids.values())
+        for issue_type in ["10001", "10002"]:
+            for old_sid in old_status_ids:
+                migration.append({
+                    "issueTypeId": issue_type,
+                    "statusId": old_sid,
+                    "newStatusId": default_new[0],
+                })
+        resp = requests.post(
+            f"{self.base}/rest/api/2/workflowscheme/{scheme_id}/draft/publish",
+            auth=self.auth, headers=self.headers,
+            json={"statusMappings": migration},
+            timeout=60
+        )
+        self._raise(resp)
+        return resp.json().get("id", "")
+
+    def wait_for_task(self, task_id: str, max_seconds: int = 30) -> bool:
+        """Poll a Jira async task until COMPLETE. Returns True on success."""
+        import time
+        for _ in range(max_seconds // 2):
+            resp = requests.get(
+                f"{self.base}/rest/api/2/task/{task_id}",
+                auth=self.auth, headers=self.headers, timeout=15
+            )
+            if resp.ok:
+                status = resp.json().get("status", "")
+                if status == "COMPLETE":
+                    return True
+                if status in ("FAILED", "CANCELLED"):
+                    return False
+            time.sleep(2)
+        return False
 
 
 # ── ADF helpers ──────────────────────────────────────────────────────────────

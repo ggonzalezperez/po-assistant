@@ -149,6 +149,30 @@ def setup():
         fid = created.get(name, "customfield_XXXXX")
         console.print(f"  {env_key}={fid}")
 
+    # ── Workflow Kanban con 10 estados ────────────────────────────────────────
+    section_rule("Workflow PO — 10 estados")
+    if jira.po_workflow_exists():
+        console.print(f"  [{C_MUTED}]— Workflow PO ya existe[/{C_MUTED}]")
+    else:
+        try:
+            console.print(f"  [{C_MUTED}]Creando statuses y workflow…[/{C_MUTED}]")
+            status_ids = jira.get_or_create_po_statuses()
+            jira.create_po_workflow(status_ids)
+
+            proj_data = jira._get(f"/project/{key}")
+            scheme_id = jira.get_project_scheme_id(proj_data["id"])
+            old_statuses = ["10000", "3", "10001"]
+            task_id = jira.assign_workflow_to_project(
+                scheme_id, "PO Workflow — Flexicar", old_statuses, status_ids
+            )
+            if task_id:
+                console.print(f"  [{C_MUTED}]Esperando migración…[/{C_MUTED}]")
+                jira.wait_for_task(task_id)
+
+            console.print(f"  [{C_SUCCESS}]✓[/{C_SUCCESS}] Workflow creado: 10 estados + transiciones globales")
+        except JiraError as e:
+            console.print(f"  [{C_MUTED}]— Workflow: {e}[/{C_MUTED}]")
+
     # ── Tablero Kanban ────────────────────────────────────────────────────────
     section_rule("Tablero Kanban")
     board_id = jira.get_board(key)
@@ -163,12 +187,23 @@ def setup():
                 f"  [{C_SUCCESS}]✓[/{C_SUCCESS}] Tablero Kanban creado   "
                 f"[{C_MUTED}]ID: {board_id}[/{C_MUTED}]"
             )
-            console.print(
-                f"  [{C_MUTED}]  Filtros rápidos: {len(ESTADO_ORDER)} estados del flujo PO[/{C_MUTED}]"
-            )
         except JiraError as e:
             board_id = 0
             console.print(f"  [{C_MUTED}]— Tablero: {e}[/{C_MUTED}]")
+
+    # ── Instrucciones columnas del board (una vez manual en UI) ───────────────
+    if board_id:
+        board_settings_url = (
+            f"{config.jira_base_url}/jira/software/projects/{key}/boards/{board_id}?config=columns"
+        )
+        section_rule("Configurar columnas del tablero (1 vez)")
+        console.print(
+            f"  [{C_MUTED}]El board Kanban necesita 10 columnas. Abre:[/{C_MUTED}]\n"
+            f"  [{C_ACCENT}]{board_settings_url}[/{C_ACCENT}]\n"
+            f"  [{C_MUTED}]Board settings → Columns → Añade estas columnas:[/{C_MUTED}]"
+        )
+        for i, estado in enumerate(ESTADO_ORDER, 1):
+            console.print(f"  [{C_MUTED}]  {i:>2}. {estado.display}[/{C_MUTED}]")
 
     # ── Equipo PO — Componentes ───────────────────────────────────────────────
     if config.po_team:
