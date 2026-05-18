@@ -1,5 +1,6 @@
+import json
 from unittest.mock import MagicMock, patch
-from po_assistant.workflow.qa import append_section, _build_section_header
+from po_assistant.workflow.qa import append_section, _build_section_header, ask_multiline
 
 
 def _make_issue(description: str) -> MagicMock:
@@ -18,7 +19,6 @@ def test_append_section_empty_description():
     fields = call_args[0][1]
     assert "description" in fields
     adf = fields["description"]
-    import json
     adf_text = json.dumps(adf, ensure_ascii=False)
     assert "TRIAGE" in adf_text
     assert "Decisión: entra a Discovery." in adf_text
@@ -34,7 +34,6 @@ def test_append_section_adds_to_existing():
     call_args = jira.update_issue.call_args
     fields = call_args[0][1]
     adf = fields["description"]
-    import json
     adf_text = json.dumps(adf)
     assert "INTAKE" in adf_text
     assert "TRIAGE" in adf_text
@@ -54,5 +53,14 @@ def test_append_section_date_in_header():
         append_section(jira, "FP-1", "DISCOVERY", "Ficha aquí.")
 
     call_args = jira.update_issue.call_args
-    adf_text = str(call_args)
+    fields = call_args[0][1]
+    adf_text = json.dumps(fields["description"], ensure_ascii=False)
     assert "2026-05-20" in adf_text
+
+
+def test_ask_multiline_joins_lines_until_blank():
+    inputs = iter(["línea uno", "línea dos", ""])
+    with patch("builtins.input", side_effect=lambda: next(inputs)):
+        with patch("po_assistant.workflow.qa.console"):
+            result = ask_multiline("¿Cuéntame?")
+    assert result == "línea uno\nlínea dos"
