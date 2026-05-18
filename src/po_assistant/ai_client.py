@@ -41,12 +41,22 @@ class AIClient:
     def call_json(self, prompt_file: str, variables: dict[str, str], max_tokens: int = 4096) -> dict:
         """Like call() but parses the response as JSON."""
         raw = self.call(prompt_file, variables, max_tokens)
-        # Strip markdown code fences if present
         cleaned = raw.strip()
+        # Strip markdown code fences if present
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            cleaned = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+            cleaned = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:]).strip()
+        # Try direct parse first
         try:
             return json.loads(cleaned)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"La IA no devolvió JSON válido.\nRespuesta recibida:\n{raw[:500]}") from e
+        except json.JSONDecodeError:
+            pass
+        # Fallback: extract first {...} block (model added explanatory text around JSON)
+        start = cleaned.find("{")
+        end = cleaned.rfind("}") + 1
+        if start != -1 and end > start:
+            try:
+                return json.loads(cleaned[start:end])
+            except json.JSONDecodeError:
+                pass
+        raise ValueError(f"La IA no devolvió JSON válido.\nRespuesta recibida:\n{raw[:500]}")

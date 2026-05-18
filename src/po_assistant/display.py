@@ -461,7 +461,7 @@ def confirm(prompt: str, default: bool = True) -> bool:
     hint = "S/n" if default else "s/N"
     console.print(f"  [{C_ACCENT}]{ICON_ARROW}[/{C_ACCENT}] {prompt} [{C_MUTED}][{hint}][/{C_MUTED}]: ", end="")
     try:
-        answer = input().strip().lower()
+        answer = input().strip().strip("﻿").lower()
     except (EOFError, KeyboardInterrupt):
         raise typer.Abort()
     if not answer:
