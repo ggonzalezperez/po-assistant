@@ -431,6 +431,66 @@ def pipeline_table(rows: list[dict], project_key: str, now_str: str) -> None:
     console.print(Padding(table, (0, 2)))
 
 
+def dashboard_estado_block(
+    display_name: str,
+    color: str,
+    issues: list[dict],
+    sla_label: str = "",
+) -> None:
+    """
+    Render one Kanban state block for the expanded dashboard view.
+
+    Each dict in `issues` has:
+        key (str), tipo (str), summary (str), age (str), assignee (str), sla_alert (bool)
+    """
+    n = len(issues)
+    issue_word = "issue" if n == 1 else "issues"
+
+    header = f"  [{color}]{display_name}[/{color}]  [{C_MUTED}]·  {n} {issue_word}[/{C_MUTED}]"
+    if sla_label:
+        header += f"  [{C_MUTED}]·  SLA {sla_label}[/{C_MUTED}]"
+    console.print(header)
+
+    if n == 0:
+        console.print(f"  [{C_MUTED}]──── vacío[/{C_MUTED}]")
+        console.print()
+        return
+
+    table = Table(box=None, show_header=False, padding=(0, 1))
+    table.add_column("Key",      style=C_ACCENT,  width=8)
+    table.add_column("Tipo",     style=C_MUTED,   width=13)
+    table.add_column("Summary",  min_width=40)
+    table.add_column("Age",      justify="right", width=14)
+    table.add_column("Assignee", style=C_MUTED,   width=22)
+
+    for issue in issues:
+        tipo_raw = issue.get("tipo", "")
+        if tipo_raw:
+            tipo_cell = f"[dim][{tipo_raw.upper()}][/dim]"
+        else:
+            tipo_cell = f"[{C_MUTED}]—[/{C_MUTED}]"
+
+        summary_raw = issue.get("summary", "")
+        if len(summary_raw) > 62:
+            summary_cell = summary_raw[:62] + "…"
+        else:
+            summary_cell = summary_raw
+
+        age_raw = issue.get("age", "")
+        if issue.get("sla_alert"):
+            age_cell = f"[red]{age_raw} ⚠ SLA[/red]"
+        else:
+            age_cell = f"[{C_MUTED}]{age_raw}[/{C_MUTED}]"
+
+        assignee_raw = issue.get("assignee", "")
+        assignee_cell = assignee_raw if assignee_raw else f"[{C_MUTED}]sin asignar[/{C_MUTED}]"
+
+        table.add_row(issue["key"], tipo_cell, summary_cell, age_cell, assignee_cell)
+
+    console.print(Padding(table, (0, 6)))
+    console.print()
+
+
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
 def _rule_thin() -> None:

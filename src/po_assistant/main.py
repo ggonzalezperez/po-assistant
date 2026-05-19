@@ -14,7 +14,8 @@ from .config import load_config
 from .display import (
     console, app_header, step_bar, section_rule,
     notify_success, notify_warning, notify_error,
-    pipeline_table, demo_welcome, demo_scenario_card, demo_summary,
+    pipeline_table, dashboard_estado_block,
+    demo_welcome, demo_scenario_card, demo_summary,
     _help_row, C_MUTED, C_ACCENT, C_PRIMARY, C_SUCCESS, C_ERROR,
     ICON_ARROW,
 )
@@ -455,34 +456,50 @@ def dashboard(
             no_estado.append(issue)
 
     now = datetime.now(timezone.utc)
-    rows: list[dict] = []
     visible_estados = ESTADO_ORDER + ([POEstado.CERRADO, POEstado.RECHAZADO] if show_closed else [])
 
+    SLA_LABELS = {
+        POEstado.INTAKE:      ">48h",
+        POEstado.SIGN_OFF_SH: ">5 días",
+        POEstado.DOR_GATE:    ">2 días",
+    }
+
+    console.print()
     for estado in visible_estados:
         issues_in = by_estado.get(estado.value, [])
         color = ESTADO_COLOR.get(estado, "white")
 
-        oldest = ""
-        if issues_in:
-            sorted_i = sorted(issues_in, key=lambda x: x.created)
-            dt = _parse_date(sorted_i[0].created)
-            if dt:
-                oldest = _fmt_age(now - dt)
+        sorted_issues = sorted(issues_in, key=lambda x: x.created)
 
-        alerts = _build_alerts(estado, issues_in, now)
+        issue_data: list[dict] = []
+        for issue in sorted_issues:
+            # Extract tipo from labels (label starting with "tipo:")
+            tipo = ""
+            for lbl in (issue.labels or []):
+                if lbl.startswith("tipo:"):
+                    tipo = lbl[len("tipo:"):]
+                    break
+
+            dt = _parse_date(issue.created)
+            age = _fmt_age(now - dt) if dt else "?"
+
+            sla_alert = False
+            max_h = SLA_HOURS.get(estado)
+            if max_h and dt:
+                sla_alert = (now - dt).total_seconds() / 3600 > max_h
+
+            issue_data.append({
+                "key":       issue.key,
+                "tipo":      tipo,
+                "summary":   issue.summary,
+                "age":       age,
+                "assignee":  issue.assignee or "",
+                "sla_alert": sla_alert,
+            })
+
+        sla_label = SLA_LABELS.get(estado, "")
         label = estado.display if hasattr(estado, "display") else estado.value.upper()
-
-        rows.append({
-            "label":   estado.value,
-            "display": label,
-            "count":   len(issues_in),
-            "oldest":  oldest,
-            "color":   color,
-            "alerts":  alerts,
-        })
-
-    pipeline_table(rows, config.jira_po_project_key,
-                   now.strftime("%Y-%m-%d %H:%M UTC"))
+        dashboard_estado_block(label, color, issue_data, sla_label)
 
     total    = len(issues)
     done     = len(by_estado.get(POEstado.CERRADO.value, []))
