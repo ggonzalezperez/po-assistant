@@ -345,6 +345,34 @@ po release FP-12
 
 ---
 
+### `po kpis`
+
+**Cuándo usarlo:** Viernes (publicación semanal), primer lunes de mes, o cuando necesites analizar la salud del pipeline.
+
+```bash
+po kpis                        # dashboard en terminal
+po kpis --export               # + exportar a Markdown
+po kpis --out informe.md       # nombre de archivo personalizado
+po kpis --weeks 12             # throughput de las últimas 12 semanas
+```
+
+**Qué muestra (10 KPIs extraídos de Jira, agrupados en 6 familias):**
+
+| Familia | KPIs disponibles desde Jira |
+|---|---|
+| F1 — Calidad de entrada | % DoR ≥ 11/12 · Tiempo Intake→Sign-off · % con sign-off · % con handshake |
+| F2 — Delivery | Lead time · Throughput semanal · Aging backlog |
+| F3 — Calidad de salida | % releases con UAT formal |
+| F4 — IA aplicada al PO | % HUs IA asistida |
+| F5 — Gobernanza | Urgencias declaradas (mes) |
+| F6 — Salud organizativa | Sin datos Jira (encuestas) |
+
+Los 13 KPIs restantes (GitHub, Sentry, encuestas, auditorías) aparecen como `N/A` con la fuente indicada.
+
+**Exportación Markdown** (`--export`): genera `YYYY-MM-DD-kpis-FP.md` con resumen ejecutivo, tablas por familia, sección de alertas y checklist de próximas acciones. Útil para compartir en Confluence o en el Comité Semanal.
+
+---
+
 ### `po dashboard`
 
 **Cuándo usarlo:** Al inicio del día, en el Comité Semanal, para revisar el estado del pipeline.
@@ -416,6 +444,10 @@ Jueves — Sign-offs y Handshakes
 Fin de sprint / Releases
   po uat FP-XX                        → registrar acta de validación UAT
   po release FP-XX                    → checklist de release y cierre
+
+Viernes — Publicación de KPIs
+  po kpis                             → dashboard en terminal
+  po kpis --export                    → exportar informe semanal a Markdown
 ```
 
 ---

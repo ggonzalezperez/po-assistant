@@ -24,6 +24,7 @@ Petición bruta  →  INTAKE  →  TRIAGE  →  DISCOVERY  →  DEFINICION
 | `po start-dev FP-12` | 8 — En Desarrollo | Registra leads de desarrollo y mueve a EN DESARROLLO |
 | `po uat FP-12` | 9 — UAT | Registra acta de UAT; KO devuelve a EN DESARROLLO |
 | `po release FP-12` | 10 — Release | Checklist de release y cierre del ciclo |
+| `po kpis` | — | Dashboard de KPIs extraídos de Jira + exportación Markdown |
 | `po dashboard` | — | Pipeline Kanban con SLA alerts por estado |
 | `po setup` | — | Configura proyecto Jira, campos custom, workflow y tablero |
 | `po demo` | — | Demo guiada con caso real Flexicar |
@@ -141,6 +142,11 @@ po uat FP-12
 po release FP-12
 # → Checklist de release; transitions a RELEASE
 
+# KPIs del pipeline
+po kpis                    # dashboard en terminal
+po kpis --export           # + exportar a Markdown (YYYY-MM-DD-kpis-FP.md)
+po kpis --out informe.md   # exportar con nombre específico
+
 # Revisar el pipeline
 po dashboard
 po dashboard --po ester   # filtrar por PO
@@ -170,6 +176,7 @@ po-assistant/
 │   │   ├── signoff.py       # Documento de sign-off stakeholder
 │   │   ├── handshake.py     # Acta de handshake PO → dev
 │   │   ├── start_dev.py     # Arranque formal de desarrollo → EN DESARROLLO
+│   │   ├── kpis.py          # KPI dashboard + exportación Markdown
 │   │   ├── uat.py           # Acta de UAT
 │   │   └── release.py       # Checklist de release
 │   ├── prompts/             # System prompts para Claude (.md)

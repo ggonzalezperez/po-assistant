@@ -403,6 +403,23 @@ def release(
     wf.run(issue_key, ai, jira, config)
 
 
+# ── KPIS ─────────────────────────────────────────────────────────────────────
+
+@app.command()
+def kpis(
+    export: bool = typer.Option(False, "--export", "-e", help="Exportar a Markdown"),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Ruta del archivo de exportacion"),
+    weeks: int = typer.Option(8, "--weeks", "-w", help="Semanas para calculo de throughput"),
+):
+    """
+    [bold]KPIs[/bold] — Dashboard de metricas del pipeline PO extraidas de Jira.
+    """
+    app_header("KPIs — Cuadro de Mando")
+    config, jira, _ = _clients()
+    from .workflow import kpis as wf
+    wf.run(jira, config, export=export, output=out, weeks=weeks)
+
+
 # ── DASHBOARD ────────────────────────────────────────────────────────────────
 
 @app.command()
