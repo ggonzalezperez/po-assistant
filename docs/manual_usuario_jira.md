@@ -1,478 +1,845 @@
-# Manual de usuario — Flujo PO en Jira
+# Manual de usuario — `po-assistant`
 
-> Para Product Owners de Flexicar. Cómo usar el tablero, los estados y
-> el CLI `po` en el día a día.
-
----
-
-## El tablero Kanban
-
-Abre el tablero desde:
-`https://<empresa>.atlassian.net/jira/software/projects/<CLAVE>/boards/<ID>`
-
-El tablero tiene **10 columnas** que representan los 10 pasos del flujo PO.
-Cada ticket de producto pasa de izquierda a derecha. El CLI `po` es quien
-mueve los tickets — no los arrastres manualmente.
-
-```
-INTAKE → TRIAGE → DISCOVERY → DEFINICION → SIGN-OFF SH
-    → DOR GATE → HANDSHAKE → EN DESARROLLO → UAT → RELEASE
-```
+> Para Product Owners de Flexicar. Explica qué hace cada comando, por qué existe cada paso,
+> qué verás en el terminal y qué queda guardado en Jira.
 
 ---
 
-## Los 10 estados y qué ocurre en cada uno
+## Antes de empezar
 
-| Estado | Responsable | Qué significa | Siguiente acción CLI |
-|--------|-------------|---------------|----------------------|
-| **INTAKE** | PE / PO | Petición recibida y clasificada por IA | `po triage FP-X` |
-| **TRIAGE** | Comité Semanal | Petición revisada, se decide si avanza | `po discovery FP-X` |
-| **DISCOVERY** | PO asignado | PO investiga contexto, stakeholders y viabilidad | `po define FP-X` |
-| **DEFINICION** | PO asignado | HU siendo redactada (con o sin IA) | `po dor-gate FP-X` |
-| **SIGN-OFF SH** | Stakeholder | Stakeholder revisa y aprueba el alcance | Confirmar en Jira → `po dor-gate FP-X` |
-| **DOR GATE** | IA + PO | Validación automática de los 12 bloques DoR | Si pasa (≥11/12 sin críticos): `po handshake FP-X` |
-| **HANDSHAKE** | PO + Tech Lead | Sesión de traspaso técnico al equipo dev | `po start-dev FP-X` para arrancar |
-| **EN DESARROLLO** | Equipo dev | Feature en sprint | Esperar a QA/UAT → `po uat FP-X` |
-| **UAT** | Validador designado | Pruebas funcionales con datos reales | `po release FP-X` |
-| **RELEASE** | PO | Feature desplegada, pendiente confirmación negocio | Cerrar ticket en Jira |
+### La idea central
 
-### Estados especiales
-
-| Estado | Cuándo se usa |
-|--------|--------------|
-| **CERRADO** | Feature entregada y confirmada por el negocio |
-| **RECHAZADO** | Petición descartada en triage (incidencia técnica, urgencia, devuelta al stakeholder) |
-| **APLAZADO** | Revisión aplazada al próximo Comité Semanal |
-
----
-
-## Cómo funciona la descripción del ticket
-
-Cada comando del CLI **añade** un bloque al final de la descripción de Jira — nunca sobreescribe. La historia completa del ticket queda visible:
+Cada HU en Jira tiene una **descripción acumulativa**. Cuando ejecutas un comando del CLI, no sobreescribe lo que había — añade un nuevo bloque al final. Al final del ciclo completo, la descripción del ticket es la historia completa de esa HU:
 
 ```
 ## INTAKE — 2026-05-18
-[análisis IA de la petición original]
+(clasificación IA de la petición original)
+
 ---
+
 ## TRIAGE — 2026-05-19
-[decisión del comité + justificación]
+(decisión del comité y justificación)
+
 ---
+
 ## DISCOVERY — 2026-05-20
-[ficha de contexto, stakeholders, viabilidad]
+(ficha de contexto, stakeholders, viabilidad)
+
 ---
+
 ## DEFINICION — 2026-05-21
-[HU completa]
+(HU completa generada con IA)
+
 ---
+
 ## SIGN-OFF SH — 2026-05-22
-[documento de alcance firmado por el stakeholder]
+(documento de alcance firmado por el stakeholder)
+
 ---
+
+## DOR GATE — 2026-05-22
+(score 11/12, gaps detectados)
+
+---
+
 ## HANDSHAKE — 2026-05-23
-[acta de traspaso: estimación, riesgos, dependencias]
+(acta de traspaso: estimación, riesgos, dependencias)
+
 ---
+
 ## EN DESARROLLO — 2026-05-24
-[leads de desarrollo]
-…
+(leads de desarrollo)
+
+---
+
+## UAT — 2026-05-30
+(acta de validación funcional)
+
+---
+
+## RELEASE — 2026-05-31
+(checklist de release)
 ```
 
----
+Esto significa que cualquier persona del equipo puede abrir el ticket y ver toda la historia: por qué se hizo, quién participó, qué se decidió y cuándo.
 
-## Cómo introducir respuestas en el CLI
+### Cómo responder en el terminal
 
-Los comandos guiados (triage, discovery, signoff, handshake, start-dev, uat, release) hacen preguntas
-una a una. Para cada pregunta:
-
-- **Respuesta corta** — escríbela y pulsa Enter. Después escribe `;;` y pulsa Enter para confirmar.
-- **Respuesta larga o pegada** — pega el texto (puede tener saltos de línea, listas, párrafos en blanco). Cuando hayas terminado, escribe `;;` en una nueva línea y pulsa Enter.
+Todos los comandos guiados (triage, discovery, define, signoff, etc.) hacen preguntas una a una. El CLI usa `;;` como terminador universal:
 
 ```
 ¿Cuál es el problema real detrás de esta petición?
   (;; en línea nueva para terminar)
-→ Flexicar necesita ganar autonomía técnica sobre la Intranet
-→ antes del traspaso de Minery. El equipo no conoce la arquitectura.
-→
-→ La tarea de onboarding cubre solo el uso básico, no el desarrollo.
+→ Los agentes no saben cómo cancelar una reserva en el CRM.
+→ Tienen que llamar a un técnico, lo que genera esperas y errores.
 → ;;
 ```
 
-El `;;` es el único terminador — funciona igual para respuestas cortas y largas,
-y permite pegar texto con líneas en blanco sin que el CLI avance a la siguiente pregunta.
+Funciona igual para respuestas cortas (una línea) que para respuestas largas con párrafos o listas. Cuando hayas terminado de escribir, escribe `;;` en una línea nueva y pulsa Enter.
 
 ---
 
-## Cómo usar el CLI `po` — comandos del día a día
+## El flujo completo: de la petición al release
 
-### `po intake "descripción"`
+Una HU normal pasa por 10 pasos. Cada paso tiene un comando:
 
-**Cuándo usarlo:** Cuando recibes una petición nueva (llamada, email, reunión, Slack).
+```
+1. po intake "texto"     →  Recibe la petición, la clasifica con IA, crea el ticket
+2. po triage FP-12       →  Comité decide si avanza, se aplaza o se rechaza
+3. po discovery FP-12    →  PO recoge contexto con el stakeholder
+4. po define FP-12       →  IA genera la HU completa
+5. po signoff FP-12      →  Stakeholder firma el alcance
+6. po dor-gate FP-12     →  IA valida que la HU está lista para desarrollo
+7. po handshake FP-12    →  Sesión de traspaso al equipo dev
+8. po start-dev FP-12    →  Se registran los leads y empieza el sprint
+9. po uat FP-12          →  Validación funcional con el negocio
+10. po release FP-12     →  Checklist de release y cierre
+```
+
+---
+
+## La semana tipo del PO
+
+```
+Lunes — Comité Semanal de Triage
+  po dashboard             → revisar el pipeline completo antes del comité
+  po triage FP-XX          → decidir qué peticiones avanzan esta semana
+
+Durante la semana — Discovery y Definición
+  po intake "petición"     → capturar peticiones nuevas que vayan llegando
+  po discovery FP-XX       → ficha de discovery con el stakeholder
+  po define FP-XX          → HU completa con IA tras el discovery
+  po dor-gate FP-XX        → validar que la HU está completa antes del sign-off
+
+Jueves — Sign-offs y Handshakes
+  po signoff FP-XX         → documento formal de alcance para el stakeholder
+  (stakeholder confirma en el ticket de Jira)
+  po handshake FP-XX       → traspaso técnico al equipo dev
+  po start-dev FP-XX       → mover a EN DESARROLLO cuando el sprint arranque
+
+Fin de sprint
+  po uat FP-XX             → registrar el acta de validación UAT
+  po release FP-XX         → checklist de release y cierre del ciclo
+
+Viernes — KPIs
+  po kpis                  → dashboard en terminal
+  po kpis --export         → exportar informe semanal a Markdown
+```
+
+---
+
+## Comandos — guía detallada
+
+---
+
+### Paso 1 — `po intake "descripción"`
+
+**Por qué existe este paso**
+
+Las peticiones llegan por todos los canales: Slack, email, reuniones, llamadas. Sin un punto de entrada unificado, algunas se pierden y las que llegan no tienen formato ni prioridad. `po intake` convierte cualquier petición en texto en un ticket de Jira estructurado y clasificado.
+
+**Cuándo usarlo**
+
+Cada vez que recibes una petición nueva que puede ser una funcionalidad, un problema o una mejora. Cuanto antes, mejor — aunque sea al final del día después de una llamada.
+
+**Cómo usarlo**
 
 ```bash
 po intake "Los agentes de tienda no encuentran cómo cancelar una reserva en el CRM"
 ```
 
-**Qué hace:**
-1. La IA clasifica la petición (tipo, prioridad)
-2. Redacta una descripción estructurada
-3. Crea el ticket en Jira en estado **INTAKE**
-4. Muestra preguntas abiertas para el triage/discovery
+**Qué ocurre en el terminal**
 
-**Siguiente:** `po triage FP-XX`
+La IA analiza el texto, decide el tipo de petición (problema / mejora / nueva funcionalidad), asigna prioridad y crea el ticket. Verás algo así:
+
+```
+─────── Nuevo intake ──────────────────────────────
+  Clasificando con IA...
+
+  Tipo:      problema
+  Prioridad: alta
+  Título:    [PROBLEMA] Los agentes no pueden cancelar reservas en CRM
+
+  Preguntas para el triage:
+  - ¿Afecta a todas las tiendas o solo algunas?
+  - ¿Existe workaround actual? ¿Cuánto tarda?
+  - ¿Hay un caso de negocio claro (KPI afectado)?
+
+  ✓ Ticket FP-12 creado en Jira → estado INTAKE
+  Siguiente: po triage FP-12
+```
+
+**Qué queda en Jira**
+
+Se crea el ticket `FP-12` con:
+- Título estructurado `[TIPO] Descripción`
+- Campo `Tipo Peticion` = problema
+- Estado = INTAKE
+- Sección `## INTAKE — YYYY-MM-DD` en la descripción con la clasificación IA y las preguntas para el triage
 
 ---
 
-### `po triage FP-XX`
+### Paso 2 — `po triage FP-12`
 
-**Cuándo usarlo:** En el Comité Semanal de Triage, después del intake.
+**Por qué existe este paso**
+
+No todas las peticiones merecen el mismo tratamiento. Algunas son incidencias técnicas (no son del PO), otras son urgencias que requieren un canal especial, y muchas son ideas válidas pero sin suficiente contexto para avanzar. El triage del lunes filtra y prioriza antes de invertir tiempo en el discovery.
+
+**Cuándo usarlo**
+
+En el Comité Semanal de Triage (lunes), para cada ticket que esté en estado INTAKE.
+
+**Cómo usarlo**
 
 ```bash
 po triage FP-12
 ```
 
-**Qué hace:**
-1. Muestra el contexto actual del ticket
-2. Presenta 5 opciones de decisión:
-   - **Incidencia técnica** → redirige a soporte / dev (RECHAZADO)
-   - **Urgencia real** → vía urgencias (RECHAZADO del pipeline normal)
-   - **Idea sin problema claro** → devuelve al stakeholder con preguntas (RECHAZADO)
-   - **Mejora con prioridad clara** → avanza a Discovery (TRIAGE)
-   - **Mejora con prioridad dudosa** → aplaza al Comité siguiente (APLAZADO)
-3. La IA formatea la decisión y la añade al ticket
-4. Guarda en Jira y actualiza el estado
+**Qué ocurre en el terminal**
 
-**Siguiente (opción 4):** `po discovery FP-XX`
+El CLI muestra el contexto del ticket y te presenta 5 opciones:
+
+```
+─────── Triage — FP-12 ──────────────────────────────
+  Los agentes de tienda no encuentran cómo cancelar una reserva en el CRM
+  Tipo: problema · Prioridad: alta
+
+  ¿Cuál es la naturaleza de esta petición?
+
+  1. Incidencia técnica → redirigir a soporte / equipo dev
+  2. Urgencia real → vía urgencias (fuera del pipeline normal)
+  3. Idea sin problema claro → devolver al stakeholder con preguntas
+  4. Mejora/problema con prioridad clara → avanzar a Discovery
+  5. Mejora/problema con prioridad dudosa → aplazar al Comité siguiente
+
+  Opción [1-5]:
+```
+
+Después de elegir, el CLI pregunta la justificación y el PO asignado (si avanza a Discovery).
+
+**Qué queda en Jira**
+
+Se añade la sección `## TRIAGE — YYYY-MM-DD` con:
+- La decisión tomada y la justificación
+- PO asignado (si avanza)
+- Estado actualizado (TRIAGE, APLAZADO o RECHAZADO)
+
+**Casos especiales**
+
+- Si eliges opción 1 (incidencia técnica) o 3 (idea sin contexto) → estado RECHAZADO, el ticket queda documentado pero fuera del pipeline
+- Si eliges opción 5 → estado APLAZADO, aparecerá de nuevo en el tablero el próximo lunes
 
 ---
 
-### `po discovery FP-XX`
+### Paso 3 — `po discovery FP-12`
 
-**Cuándo usarlo:** Tras el triage, cuando el PO asignado empieza el discovery.
+**Por qué existe este paso**
+
+Antes de escribir la HU, el PO necesita entender bien el problema. Sin discovery estructurado, es habitual llegar a la definición con información incompleta y tener que volver atrás. El discovery guiado garantiza que se recogen todos los datos necesarios antes de que la IA genere la HU.
+
+**Cuándo usarlo**
+
+Después del triage, cuando el PO asignado se sienta con el stakeholder (o en la reunión de discovery). Puedes hacerlo durante la reunión, respondiendo las preguntas en tiempo real.
+
+**Cómo usarlo**
 
 ```bash
 po discovery FP-12
 ```
 
-**Qué hace:**
-1. Guía al PO por 11 preguntas de discovery:
-   - Problema real vs. síntoma
-   - Frecuencia y volumen de afectación
-   - Usuarios afectados y perfil
-   - Solución actual y sus problemas
-   - Solución propuesta y viabilidad
-   - Dependencias técnicas y de negocio
-   - Riesgos y restricciones
-   - KPIs de éxito
-   - Stakeholder principal
-   - Contexto adicional
-2. La IA genera una ficha de discovery estructurada con todo lo recogido
-3. La añade al ticket en Jira → estado **DISCOVERY**
+**Qué ocurre en el terminal**
 
-**Fallback:** Si Jira no está disponible, guarda la ficha en `{ISSUE_KEY}-discovery.md` localmente.
+El CLI hace 11 preguntas guiadas, una a una. Ejemplos:
 
-**Siguiente:** `po define FP-XX`
+```
+─────── Discovery — FP-12 ──────────────────────────────
+  Los agentes de tienda no pueden cancelar reservas en CRM
+
+  1/11 ¿Cuál es el problema real (no la solución)?
+    (;; en línea nueva para terminar)
+  → Los agentes tienen que llamar al técnico para cancelar.
+  → Genera esperas de 10-15 min y a veces el cliente ya se fue.
+  → ;;
+
+  2/11 ¿Con qué frecuencia ocurre? ¿Cuántos usuarios afectados?
+    (;; en línea nueva para terminar)
+  → ...
+```
+
+**Las 11 preguntas cubren:**
+1. Problema real (no la solución propuesta)
+2. Frecuencia y volumen de impacto
+3. Usuarios afectados y su perfil
+4. Solución actual y sus problemas
+5. Solución propuesta y cómo encaja con el negocio
+6. Dependencias técnicas y de otros equipos
+7. Riesgos y restricciones conocidas
+8. KPIs de éxito (cómo sabremos que funcionó)
+9. Stakeholder principal y validador UAT
+10. Contexto adicional relevante
+11. Preguntas que han quedado abiertas
+
+**Qué queda en Jira**
+
+La IA genera una ficha de discovery estructurada con todo lo recogido y la añade como sección `## DISCOVERY — YYYY-MM-DD`. El estado pasa a DISCOVERY.
+
+**Fallback sin conexión**
+
+Si Jira no está disponible, la ficha se guarda localmente en `FP-12-discovery.md`. Cuando recuperes la conexión, puedes añadirla manualmente a Jira o reejecutar el comando.
 
 ---
 
-### `po define FP-XX`
+### Paso 4 — `po define FP-12`
 
-**Cuándo usarlo:** Después de completar el discovery, cuando tienes suficiente información para escribir la HU.
+**Por qué existe este paso**
+
+Redactar una HU completa y bien estructurada lleva tiempo. La IA puede hacerlo en 30 segundos usando toda la información que ya está en el ticket (el intake, el discovery). El PO revisa, completa los `[PENDIENTE:]` y la adapta. Es mucho más rápido que escribir desde cero.
+
+**Cuándo usarlo**
+
+Después de completar el discovery y tener suficiente contexto. Si tienes notas adicionales de la reunión, puedes pasarlas con `--notes`.
+
+**Cómo usarlo**
 
 ```bash
 po define FP-12
-# Con notas de una reunión:
+
+# Si tienes notas extra de la reunión:
 po define FP-12 --notes notas_reunion_maria.txt
 ```
 
-**Qué hace:**
-1. Lee el contexto acumulado del ticket de Jira
-2. La IA genera la HU completa en 6 bloques:
-   - Contexto y problema
-   - Descripción funcional
-   - Criterios de aceptación
-   - Plan UAT
-   - Operativa (prioridad, dependencias)
-   - Trazabilidad IA
-3. Añade la HU como sección `## DEFINICION` al ticket
-4. Mueve el ticket a estado **DEFINICION**
+**Qué ocurre en el terminal**
 
-**Duración:** ~30-45 segundos (llamada a Claude API).
+El comando lee el contexto acumulado del ticket y llama a Claude. Tarda unos 30-45 segundos:
 
-**Siguiente:** `po dor-gate FP-XX`
+```
+─────── Definición — FP-12 ──────────────────────────────
+  Leyendo contexto del ticket...
+  Generando HU con IA (claude-sonnet-4-6)...
 
----
+  ✓ HU generada — 6 bloques
 
-### `po dor-gate FP-XX`
-
-**Cuándo usarlo:** Cuando la HU está escrita y quieres validar si está lista para el Handshake.
-
-```bash
-po dor-gate FP-12
+  Revisa los [PENDIENTE:] antes del DOR GATE.
+  Siguiente: po dor-gate FP-12
 ```
 
-**Qué hace:**
-1. La IA evalúa los 12 bloques del DoR (Definition of Ready)
-2. Muestra un informe con score y gaps por bloque
-3. Guarda el resultado como comentario en Jira
-4. Actualiza los campos `DoR Score` y `DoR Gaps`
-5. Mueve el ticket:
-   - Si pasa (≥11/12 sin bloques críticos fallidos) → **DOR GATE**
-   - Si no pasa → **DEFINICION** (vuelve a completar los gaps)
+**Qué queda en Jira**
 
-**Los 6 bloques críticos** (deben cumplir siempre):
-- B1: Problema definido (no solución)
-- B5: Alcance + exclusiones explícitas
-- B7: Reglas de negocio críticas
-- B9: Casuística completa
-- B10: Criterios de aceptación verificables
-- B12: Validador UAT designado
+La IA genera la HU en 6 bloques y la añade como sección `## DEFINICION — YYYY-MM-DD`:
 
-**Siguiente (si pasa):** `po signoff FP-XX`
+```
+## Contexto y problema
+...
+
+## Descripción funcional
+...
+
+## Criterios de aceptación
+- [ ] CA1: ...
+- [ ] CA2: ...
+
+## Plan UAT
+...
+
+## Operativa
+Prioridad: Alta
+Dependencias: ...
+
+## Trazabilidad IA
+Modelo: claude-sonnet-4-6 | Fecha: ...
+```
+
+**Importante**
+
+La HU generada es un borrador. Es normal que tenga algunos `[PENDIENTE: ...]`. El PO debe revisarla, completar los pendientes y adaptarla a la realidad antes de ejecutar el DOR GATE.
 
 ---
 
-### `po signoff FP-XX`
+### Paso 5 — `po signoff FP-12`
 
-**Cuándo usarlo:** Tras el DoR Gate, antes del Handshake. Requiere confirmación formal del stakeholder.
+**Por qué existe este paso**
+
+Antes de involucrar al equipo técnico, el stakeholder debe confirmar formalmente que el alcance es correcto. Sin este paso, es habitual que en el handshake o en la UAT aparezca "eso no era lo que pedíamos". El sign-off documenta el acuerdo explícito y evita malentendidos.
+
+**Cuándo usarlo**
+
+Cuando la HU está redactada y el DOR GATE ha pasado (o mientras se resuelven los gaps menores). Requiere una reunión o llamada con el stakeholder firmante.
+
+**Cómo usarlo**
 
 ```bash
 po signoff FP-12
 ```
 
-**Qué hace:**
-1. Recoge los datos del sign-off:
-   - Firmante (nombre y rol)
-   - Fecha de la reunión de discovery
-   - Funcionalidades acordadas (alcance positivo)
-   - Exclusiones explícitas (alcance negativo)
-   - MVP acordado
-   - Validador UAT y disponibilidad
-   - Fecha objetivo (opcional)
-   - Limitaciones del stakeholder
-2. La IA genera el documento formal de sign-off
-3. Lo añade al ticket y mueve a **SIGN-OFF SH**
+**Qué ocurre en el terminal**
 
-**Acción siguiente:** Comparte la URL del ticket con el firmante para que confirme en un comentario. Cuando confirme, ejecuta `po dor-gate FP-XX` de nuevo si es necesario, o `po handshake FP-XX`.
+El CLI recoge los datos del sign-off con preguntas guiadas:
+
+```
+─────── Sign-off — FP-12 ──────────────────────────────
+
+  Firmante (nombre y cargo):
+  → María Ruiz — Responsable Operaciones Comerciales
+  → ;;
+
+  Funcionalidades acordadas (alcance positivo):
+  → Botón "Cancelar reserva" visible en la ficha del cliente.
+  → Cancela la reserva y envía confirmación al cliente por email.
+  → ;;
+
+  Exclusiones explícitas (qué NO entra):
+  → No incluye devolución de señal en este MVP.
+  → ;;
+
+  MVP acordado:
+  → Cancelación manual desde CRM en 1 clic.
+  → ;;
+
+  ...
+```
+
+**Qué queda en Jira**
+
+La IA genera el documento formal de sign-off y lo añade como sección `## SIGN-OFF SH — YYYY-MM-DD`. El estado pasa a SIGN-OFF SH.
+
+**Acción requerida**
+
+Comparte la URL del ticket con el firmante para que añada un comentario confirmando el alcance. Cuando lo haga, ya puedes avanzar al DOR GATE o directamente al Handshake.
 
 ---
 
-### `po handshake FP-XX`
+### Paso 6 — `po dor-gate FP-12`
 
-**Cuándo usarlo:** En la sesión de traspaso técnico con el equipo de desarrollo.
+**Por qué existe este paso**
+
+El DoR (Definition of Ready) es el conjunto de condiciones que debe cumplir una HU antes de entrar en desarrollo. Sin validación sistemática, es habitual que el equipo técnico reciba HUs incompletas y tenga que parar el sprint para pedir aclaraciones. El DOR GATE valida 12 bloques automáticamente con IA.
+
+**Cuándo usarlo**
+
+Cuando la HU está redactada (después de `po define`) y antes del Handshake. Puedes ejecutarlo varias veces hasta que pase.
+
+**Cómo usarlo**
+
+```bash
+po dor-gate FP-12
+```
+
+**Qué ocurre en el terminal**
+
+La IA evalúa la HU contra los 12 bloques del DoR y muestra el resultado:
+
+```
+─────── DOR Gate — FP-12 ──────────────────────────────
+
+  Evaluando 12 bloques DoR con IA...
+
+  B1  Problema definido (no solución)        ✓
+  B2  Contexto de negocio                    ✓
+  B3  Usuarios afectados                     ✓
+  B4  Frecuencia / volumen                   ✓
+  B5  Alcance + exclusiones explícitas       ✓
+  B6  Diagrama / mockup                      ~ (recomendado, no bloqueante)
+  B7  Reglas de negocio críticas             ✓
+  B8  Dependencias externas                  ✓
+  B9  Casuística completa                    ✗ FALTA: casos de error no documentados
+  B10 Criterios de aceptación verificables   ✓
+  B11 Estimación orientativa                 ~ (sin estimación)
+  B12 Validador UAT designado                ✓
+
+  Score: 10/12 — KO (B9 es bloque crítico)
+
+  Acción: Completa B9 en la sección DEFINICION de Jira y vuelve a ejecutar po dor-gate.
+```
+
+**Resultados posibles**
+
+- **≥ 11/12 sin bloques críticos fallidos** → pasa a estado DOR GATE. Siguiente: `po handshake FP-12`
+- **< 11/12 o algún crítico fallido** → vuelve a DEFINICION. Corrige los gaps indicados en la descripción de Jira y vuelve a ejecutar `po dor-gate`
+
+**Los 6 bloques críticos** (deben cumplir siempre):
+B1 · B5 · B7 · B9 · B10 · B12
+
+**Qué queda en Jira**
+
+El resultado del DOR GATE se añade como comentario al ticket, y los campos `DoR Score` y `DoR Gaps` se actualizan con el score y la lista de gaps.
+
+---
+
+### Paso 7 — `po handshake FP-12`
+
+**Por qué existe este paso**
+
+El handshake es la reunión donde el PO traspasa la HU al equipo técnico. Sin un acta estructurada, las decisiones tomadas en esa reunión se pierden. El handshake documenta: quién asistió, qué preguntas hizo el equipo, qué riesgos se identificaron, la estimación y si hay algún gap que impida arrancar.
+
+**Cuándo usarlo**
+
+En la sesión de traspaso técnico, con el PO y el equipo de desarrollo presentes.
+
+**Cómo usarlo**
 
 ```bash
 po handshake FP-12
 ```
 
-**Qué hace:**
-1. Recoge los datos del handshake:
-   - Asistentes
-   - Score del DoR Gate previo
-   - Dudas planteadas por desarrollo y respuestas
-   - Supuestos validados
-   - Riesgos técnicos identificados
-   - Estimación inicial
-   - Dependencias confirmadas
-   - Decisión final (2 opciones)
-2. La IA genera el acta de handshake
-3. La guarda en Jira y actualiza el estado:
-   - **OK para arrancar dev** → HANDSHAKE
-   - **Vuelve a Definición** (gaps) → DEFINICION
+**Qué ocurre en el terminal**
 
-**Siguiente (OK):** `po start-dev FP-XX` para mover a EN DESARROLLO y dejar constancia en Jira.
+El CLI recoge los datos con preguntas guiadas:
+
+```
+─────── Handshake — FP-12 ──────────────────────────────
+  Los agentes no pueden cancelar reservas en CRM · Score DoR: 11/12
+
+  Asistentes (nombre — rol, uno por línea, ;; para terminar):
+  → Carlos López — Backend
+  → Sara Martín — Frontend
+  → ;;
+
+  Dudas de desarrollo y respuestas (;; para terminar):
+  → P: ¿El botón cancela también en JATO o solo en CRM?
+  → R: Solo en CRM en este MVP. JATO queda para v2.
+  → ;;
+
+  Riesgos técnicos identificados:
+  → ...
+
+  Estimación inicial:
+  → 5 puntos (1 sprint)
+  → ;;
+
+  Decisión final:
+    1. OK para arrancar dev
+    2. Vuelve a Definición (hay gaps)
+  Opción [1/2]:
+```
+
+**Qué queda en Jira**
+
+La IA genera el acta de handshake y la añade como sección `## HANDSHAKE — YYYY-MM-DD` con asistentes, preguntas/respuestas, riesgos, estimación y decisión. El estado pasa a HANDSHAKE (si OK) o vuelve a DEFINICION.
+
+**Siguiente**
+
+Si el handshake es OK: `po start-dev FP-12` para registrar los leads y mover a EN DESARROLLO.
 
 ---
 
-### `po start-dev FP-XX`
+### Paso 8 — `po start-dev FP-12`
 
-**Cuándo usarlo:** Justo después del Handshake OK, cuando el equipo va a arrancar el sprint.
+**Por qué existe este paso**
+
+Después del handshake, el ticket está en estado HANDSHAKE pero el equipo todavía no ha arrancado. `po start-dev` formaliza el arranque del sprint: registra quién lidera el desarrollo y mueve el ticket a EN DESARROLLO. También deja un enlace a la HU completa para que el equipo la tenga a mano.
+
+**Cuándo usarlo**
+
+Justo cuando el equipo va a empezar a desarrollar (normalmente al inicio del sprint, después del handshake).
+
+**Cómo usarlo**
 
 ```bash
 po start-dev FP-12
 ```
 
-**Qué hace:**
-1. Pregunta quiénes lideran el desarrollo (nombre — rol, uno por línea)
-2. Añade la sección `## EN DESARROLLO` con los leads y un enlace a la HU (ya en la sección DEFINICION)
-3. Mueve el ticket a estado **EN DESARROLLO**
+**Qué ocurre en el terminal**
 
-**Siguiente:** Cuando desarrollo termine → `po uat FP-XX`
+```
+─────── Arrancar desarrollo — FP-12 ──────────────────────────────
+
+  ¿Quiénes lideran el desarrollo?
+  (Uno por línea: Nombre — Rol. Ej: Carlos López — Backend)
+  → Carlos López — Backend
+  → Sara Martín — Frontend
+  → ;;
+
+  ¿Mover a EN DESARROLLO? [S/n]: S
+
+  ✓ HU FP-12 en marcha. Estado → EN DESARROLLO.
+  Siguiente cuando termine dev: po uat FP-12
+```
+
+**Qué queda en Jira**
+
+Se añade la sección `## EN DESARROLLO — YYYY-MM-DD` con los leads de desarrollo y un enlace a la sección DEFINICION (donde está la HU completa). El estado pasa a EN DESARROLLO.
 
 ---
 
-### `po uat FP-XX`
+### Paso 9 — `po uat FP-12`
 
-**Cuándo usarlo:** Cuando desarrollo termina y el validador designado ha realizado las pruebas funcionales.
+**Por qué existe este paso**
+
+La UAT (User Acceptance Testing) es la validación funcional con el negocio antes del release. Sin un acta formal, es habitual que después del deploy aparezca "esto no funciona como esperábamos" sin que quede claro qué se validó y quién lo validó. El acta de UAT deja constancia de qué se probó, qué falló y quién dio el OK.
+
+**Cuándo usarlo**
+
+Cuando el equipo de desarrollo ha terminado y el validador designado ha hecho las pruebas en el entorno de PRE.
+
+**Cómo usarlo**
 
 ```bash
 po uat FP-12
 ```
 
-**Qué hace:**
-1. Recoge los datos de la UAT:
-   - Validador funcional (nombre, rol)
-   - Entorno (normalmente PRE)
-   - Casuísticas validadas y resultado
-   - Defectos detectados
-   - Decisión final (3 opciones)
-2. La IA genera el acta de UAT
-3. La guarda en Jira y actualiza el estado:
-   - **UAT OK** → UAT
-   - **UAT KO** (con observaciones) → EN DESARROLLO (vuelve a dev)
-   - **UAT OK condicional** (defectos menores trackeados aparte) → UAT
+**Qué ocurre en el terminal**
 
-**Siguiente (OK/condicional):** `po release FP-XX`
+El CLI recoge los datos de la UAT:
+
+```
+─────── UAT — FP-12 ──────────────────────────────
+
+  Validador funcional (nombre y rol):
+  → María Ruiz — Responsable Operaciones Comerciales
+  → ;;
+
+  Entorno de validación:
+  → PRE
+  → ;;
+
+  Casuísticas validadas y resultado (;; para terminar):
+  → CA1: Cancelar reserva desde ficha de cliente → OK
+  → CA2: Email de confirmación al cliente → OK
+  → CA3: Intentar cancelar reserva ya cancelada → OK, mensaje de error correcto
+  → ;;
+
+  Defectos detectados:
+  → Ninguno
+  → ;;
+
+  Decisión final:
+    1. UAT OK — todo correcto
+    2. UAT KO — hay defectos bloqueantes (vuelve a desarrollo)
+    3. UAT OK condicional — defectos menores trackeados aparte
+  Opción [1-3]:
+```
+
+**Resultados posibles**
+
+- **UAT OK** → estado UAT. Siguiente: `po release FP-12`
+- **UAT KO** → vuelve a EN DESARROLLO. Los defectos quedan documentados para el equipo técnico
+- **UAT OK condicional** → estado UAT. Los defectos menores se documentan y trackean en tickets separados
+
+**Qué queda en Jira**
+
+La IA genera el acta de UAT y la añade como sección `## UAT — YYYY-MM-DD` con validador, entorno, resultados por casuística y decisión.
 
 ---
 
-### `po release FP-XX`
+### Paso 10 — `po release FP-12`
 
-**Cuándo usarlo:** Cuando el equipo va a hacer el despliegue a producción.
+**Por qué existe este paso**
+
+El checklist de release es el último filtro antes del despliegue a producción. Verifica que todo está en orden: UAT firmada, PR mergeado, tests en verde, rollback preparado, comunicación al negocio lista. Si algo falta, es mejor saberlo antes de desplegar.
+
+**Cuándo usarlo**
+
+Cuando el equipo va a hacer el despliegue a producción.
+
+**Cómo usarlo**
 
 ```bash
 po release FP-12
 ```
 
-**Qué hace:**
-1. Recoge los datos del release:
-   - Fecha de release
-   - Tipo de release (hotfix / release normal)
-   - Lead técnico
-   - Confirmaciones de checklist: UAT OK, sign-off PO, PR mergeado, tests verde, rollback preparado
-   - Comunicación al negocio
-   - Responsable de post-deploy
-2. La IA genera el documento de release con el checklist
-3. Lo guarda en Jira y mueve a **RELEASE**
+**Qué ocurre en el terminal**
 
-**Siguiente:** Confirmar en Jira cuando el negocio dé el visto bueno → cerrar el ticket.
+El CLI recoge los datos del release con un checklist:
+
+```
+─────── Release — FP-12 ──────────────────────────────
+
+  Fecha de release (YYYY-MM-DD):
+  → 2026-05-31
+  → ;;
+
+  ¿UAT OK firmado?     [S/n]: S
+  ¿Sign-off PO?        [S/n]: S
+  ¿PR mergeado?        [S/n]: S
+  ¿Tests en verde?     [S/n]: S
+  ¿Rollback preparado? [S/n]: S
+
+  Comunicación al negocio (;; para terminar):
+  → Comunicado enviado por email a María Ruiz y a todo el equipo de tiendas.
+  → ;;
+
+  ✓ Checklist completo. Estado → RELEASE.
+  Siguiente: cuando el negocio confirme → cierra el ticket en Jira.
+```
+
+**Qué queda en Jira**
+
+La IA genera el documento de release y lo añade como sección `## RELEASE — YYYY-MM-DD` con el checklist completo, fecha de deploy y responsable de post-deploy.
+
+**Última acción**
+
+Cuando el negocio confirme que todo va bien en producción, cierra el ticket manualmente en Jira (estado CERRADO).
 
 ---
 
-### `po kpis`
+## Funciones de análisis
 
-**Cuándo usarlo:** Viernes (publicación semanal), primer lunes de mes, o cuando necesites analizar la salud del pipeline.
+---
+
+### `po kpis` — Dashboard de KPIs
+
+**Por qué existe**
+
+El pipeline de HUs genera datos valiosos que están dispersos en Jira: tiempos de ciclo, tasa de éxito del DOR GATE, throughput, aging del backlog... `po kpis` extrae esos datos automáticamente y los presenta como un cuadro de mando. Útil para el Comité Semanal, para el reporting mensual y para detectar cuellos de botella.
+
+**Cuándo usarlo**
+
+- Viernes, para la publicación semanal de KPIs
+- Primer lunes de mes, para el reporting mensual
+- Cuando algo no funciona y quieres datos concretos
+
+**Cómo usarlo**
 
 ```bash
 po kpis                        # dashboard en terminal
-po kpis --export               # + exportar a Markdown
+po kpis --export               # + exportar a Markdown (YYYY-MM-DD-kpis-FP.md)
 po kpis --out informe.md       # nombre de archivo personalizado
-po kpis --weeks 12             # throughput de las últimas 12 semanas
+po kpis --weeks 12             # throughput de las últimas 12 semanas (defecto: 4)
 ```
 
-**Qué muestra (10 KPIs extraídos de Jira, agrupados en 6 familias):**
+**Qué muestra**
 
-| Familia | KPIs disponibles desde Jira |
-|---|---|
-| F1 — Calidad de entrada | % DoR ≥ 11/12 · Tiempo Intake→Sign-off · % con sign-off · % con handshake |
-| F2 — Delivery | Lead time · Throughput semanal · Aging backlog |
-| F3 — Calidad de salida | % releases con UAT formal |
-| F4 — IA aplicada al PO | % HUs IA asistida |
-| F5 — Gobernanza | Urgencias declaradas (mes) |
-| F6 — Salud organizativa | Sin datos Jira (encuestas) |
+Los KPIs se agrupan en 6 familias. Los que pueden calcularse directamente de Jira se muestran con valor real; los demás muestran `N/A` con la fuente donde buscarlos:
 
-Los 13 KPIs restantes (GitHub, Sentry, encuestas, auditorías) aparecen como `N/A` con la fuente indicada.
+| Familia | KPI | Fuente |
+|---------|-----|--------|
+| F1 — Calidad de entrada | % HUs con DoR ≥ 11/12 | Jira |
+| F1 — Calidad de entrada | Tiempo medio Intake → Sign-off | Jira |
+| F1 — Calidad de entrada | % HUs con sign-off formal | Jira |
+| F1 — Calidad de entrada | % HUs con handshake formal | Jira |
+| F2 — Delivery | Lead time medio (Intake → Release) | Jira |
+| F2 — Delivery | Throughput semanal | Jira |
+| F2 — Delivery | Aging del backlog (issues > 30 días sin avanzar) | Jira |
+| F3 — Calidad de salida | % releases con UAT formal | Jira |
+| F4 — IA aplicada al PO | % HUs con IA asistida | Jira |
+| F5 — Gobernanza | Urgencias declaradas (último mes) | Jira |
+| F6 — Salud organizativa | Satisfaction score POs | Encuesta manual |
 
-**Exportación Markdown** (`--export`): genera `YYYY-MM-DD-kpis-FP.md` con resumen ejecutivo, tablas por familia, sección de alertas y checklist de próximas acciones. Útil para compartir en Confluence o en el Comité Semanal.
+Los 13 KPIs que requieren fuentes externas (GitHub, Sentry, encuestas) aparecen como `N/A` con la fuente indicada.
+
+**Exportación Markdown**
+
+Con `--export` genera un archivo `YYYY-MM-DD-kpis-FP.md` con:
+- Resumen ejecutivo con alertas
+- Tablas por familia (valor, objetivo, estado)
+- Sección de KPIs sin datos y sus fuentes
+- Checklist de próximas acciones
+
+Útil para compartir en Confluence o en el Comité Semanal.
 
 ---
 
-### `po dashboard`
+### `po dashboard` — Pipeline Kanban en terminal
 
-**Cuándo usarlo:** Al inicio del día, en el Comité Semanal, para revisar el estado del pipeline.
+**Por qué existe**
+
+Antes del Comité Semanal, el PO necesita una visión rápida de qué hay en cada estado del pipeline sin tener que abrir Jira. El dashboard muestra el estado completo con alertas de SLA (tickets que llevan demasiado tiempo en un estado).
+
+**Cuándo usarlo**
+
+Al inicio del Comité Semanal, o cuando quieras revisar el estado del pipeline rápidamente.
+
+**Cómo usarlo**
 
 ```bash
-po dashboard
-# Filtrar por PO:
-po dashboard --po ester
-# Ver también cerrados:
-po dashboard --all
+po dashboard               # pipeline completo
+po dashboard --po ester    # filtrar solo los tickets de Ester
+po dashboard --all         # incluir también los cerrados y rechazados
 ```
 
-**Qué muestra:**
-- Pipeline de los 10 estados con número de issues en cada uno
+**Qué muestra**
+
+- Pipeline con el número de issues en cada estado
 - Antigüedad del issue más viejo en cada estado
-- Alertas de SLA (INTAKE > 48h, SIGN-OFF > 5 días, DOR GATE > 2 días)
+- Alertas de SLA cuando un issue lleva demasiado tiempo parado:
+  - INTAKE > 48 h sin triage
+  - SIGN-OFF SH > 5 días sin confirmar
+  - DOR GATE > 2 días sin avanzar
 
 ---
 
-## Anatomía de un ticket FP
+### `po setup` — Configuración inicial de Jira
 
-Un ticket bien configurado tiene:
+**Por qué existe**
 
-```
-Título:   [TIPO] Descripción breve del problema/funcionalidad
-Estado:   DEFINICION (columna actual en el tablero)
-Etiquetas: po-definicion  tipo:problema  prio:alta
+Solo hay que ejecutarlo una vez, cuando se configura el entorno por primera vez. Crea el proyecto FP en Jira, los 5 campos custom necesarios, el workflow de 10 estados y el tablero Kanban.
 
-Campos custom:
-  DoR Score:      8/12 (rellenado por po dor-gate)
-  DoR Gaps:       "B9: Casuística incompleta; B12: Validador sin designar"
-  IA Asistida:    Sí
-  Tipo Peticion:  problema
-  Validador UAT:  María Ruiz (Responsable Operaciones Comerciales)
+**Cuándo usarlo**
 
-Descripción (acumulativa):
-  ## INTAKE — 2026-05-18
-  ## TRIAGE — 2026-05-19
-  ## DISCOVERY — 2026-05-20
-  ## DEFINICION — 2026-05-21
-  ## SIGN-OFF SH — 2026-05-22
-  ## HANDSHAKE — 2026-05-23
-  ## EN DESARROLLO — 2026-05-24
-  …
+Solo una vez, al instalar `po-assistant` en un entorno nuevo. Ver el documento `docs/guia_setup_jira_oficial.md` para los detalles.
+
+```bash
+po setup
 ```
 
 ---
 
-## Flujo semanal tipo (referencia)
+## Preguntas frecuentes
 
-```
-Lunes — Comité Semanal de Triage
-  po dashboard                        → revisar pipeline completo
-  po triage FP-XX                     → clasificar peticiones en INTAKE
-  (cada petición: avanza, aplaza o se rechaza)
+**¿Puedo editar la HU generada por la IA directamente en Jira?**
 
-Durante la semana — Discovery / Definición
-  po intake "nueva petición"          → capturar peticiones nuevas
-  po discovery FP-XX                  → ficha de discovery guiada
-  po define FP-XX                     → generar HU tras discovery
-  po dor-gate FP-XX                   → validar DoR antes del Sign-off
+Sí, siempre. La HU es un borrador. Edita la sección `## DEFINICION` directamente en Jira si quieres corregir algo. El CLI respetará tu contenido — nunca sobreescribe.
 
-Jueves — Sign-offs y Handshakes
-  po signoff FP-XX                    → documento de alcance para stakeholder
-  (stakeholder confirma en Jira)
-  po handshake FP-XX                  → traspaso técnico al equipo dev
-  po start-dev FP-XX                  → arrancar sprint (mueve a EN DESARROLLO)
+**¿Qué hago cuando el DOR GATE da KO?**
 
-Fin de sprint / Releases
-  po uat FP-XX                        → registrar acta de validación UAT
-  po release FP-XX                    → checklist de release y cierre
+El ticket vuelve a DEFINICION. La IA indica exactamente qué bloques fallan y por qué. Edita la sección `## DEFINICION` en Jira para completar los gaps y vuelve a ejecutar `po dor-gate FP-XX`. No hay límite de intentos.
 
-Viernes — Publicación de KPIs
-  po kpis                             → dashboard en terminal
-  po kpis --export                    → exportar informe semanal a Markdown
-```
+**¿El CLI puede sobreescribir trabajo mío en Jira?**
 
----
+No. Todos los comandos añaden secciones al final de la descripción existente — nunca la sobreescriben. Puedes editar Jira directamente y el CLI respetará tu contenido.
 
-## Filtros rápidos del tablero
+**¿Qué pasa si el Handshake da KO?**
 
-El tablero tiene filtros por estado PO que aparecen como botones sobre el tablero.
-Útiles para el Comité Semanal:
+El ticket vuelve a DEFINICION. El PO resuelve los gaps identificados por el equipo y vuelve a ejecutar `po handshake FP-XX`. En la sección `## HANDSHAKE` queda documentado qué gaps impidieron arrancar.
 
-| Filtro | Para qué |
-|--------|----------|
-| INTAKE | Ver las peticiones nuevas de la semana |
-| TRIAGE | Issues en espera de decisión del Comité |
-| SIGN-OFF SH | Issues esperando aprobación de stakeholder |
-| DOR GATE | Issues listos para pasar a desarrollo |
+**¿Qué pasa si la UAT da KO?**
+
+El ticket vuelve a EN DESARROLLO. El acta de UAT queda en la descripción con el detalle completo de defectos. Cuando dev corrija, se vuelve a ejecutar `po uat FP-XX`.
+
+**¿Qué KPIs calcula `po kpis` automáticamente?**
+
+Calcula 10 KPIs directamente de Jira: % DoR cumplido, tiempo Intake→Sign-off, cobertura de sign-off, cobertura de handshake, lead time, throughput semanal, aging del backlog, cobertura de UAT formal, % IA asistida y urgencias declaradas. Los 13 KPIs restantes (GitHub, Sentry, encuestas) aparecen como `N/A` con la fuente indicada.
+
+**¿La IA puede inventar información?**
+
+No. Todos los prompts tienen la instrucción explícita de no inventar. Cuando falta información, la IA escribe `[PENDIENTE: ...]` en lugar de rellenar con datos ficticios. El PO siempre aporta el conocimiento; la IA estructura y mejora la forma.
+
+**¿Qué versión de Claude usa?**
+
+`claude-sonnet-4-6` por defecto. Configurable en `.env` con la variable `CLAUDE_MODEL`.
+
+**¿Puedo pegar texto largo con saltos de línea en las respuestas?**
+
+Sí. Todos los comandos guiados usan `;;` como terminador. Pega el texto que quieras (con párrafos, listas, Markdown), y cuando hayas terminado escribe `;;` en una línea nueva y pulsa Enter.
 
 ---
 
-## Etiquetas del sistema (no modificar manualmente)
+## Referencia rápida
 
-El CLI usa estas etiquetas para rastrear el estado. **No las edites a mano**
-en Jira — usa siempre el CLI para mover tickets.
+### Estados del ticket y su orden
 
-| Etiqueta | Estado visible en tablero |
-|----------|--------------------------|
+| Estado | Paso | Comando que lo activa |
+|--------|------|-----------------------|
+| INTAKE | 1 | `po intake "texto"` |
+| TRIAGE | 2 | `po triage FP-XX` (opción avanza) |
+| DISCOVERY | 3 | `po discovery FP-XX` |
+| DEFINICION | 4 | `po define FP-XX` |
+| SIGN-OFF SH | 5 | `po signoff FP-XX` |
+| DOR GATE | 6 | `po dor-gate FP-XX` (si pasa) |
+| HANDSHAKE | 7 | `po handshake FP-XX` (si OK) |
+| EN DESARROLLO | 8 | `po start-dev FP-XX` |
+| UAT | 9 | `po uat FP-XX` (si OK) |
+| RELEASE | 10 | `po release FP-XX` |
+| CERRADO | — | Manual en Jira |
+| RECHAZADO | — | `po triage` (opciones 1, 2, 3) |
+| APLAZADO | — | `po triage` (opción 5) |
+
+### Etiquetas del sistema
+
+El CLI gestiona estas etiquetas automáticamente. **No las edites a mano en Jira** — usa siempre el CLI para mover tickets entre estados.
+
+| Etiqueta | Estado |
+|----------|--------|
 | `po-intake` | INTAKE |
 | `po-triage` | TRIAGE |
 | `po-discovery` | DISCOVERY |
@@ -483,56 +850,6 @@ en Jira — usa siempre el CLI para mover tickets.
 | `po-en-desarrollo` | EN DESARROLLO |
 | `po-uat` | UAT |
 | `po-release` | RELEASE |
-| `po-cerrado` | — (cerrado) |
-| `po-rechazado` | — (rechazado) |
-| `po-aplazado` | — (aplazado) |
-
----
-
-## Preguntas frecuentes
-
-**¿Puedo editar la HU generada por la IA?**  
-Sí, siempre. La HU es un borrador. El PO debe revisarla, completar los
-`[PENDIENTE:]` y adaptarla al contexto real antes del DOR GATE.
-
-**¿Qué pasa si el DOR GATE da KO?**  
-El ticket vuelve a DEFINICION. La IA deja un comentario con los gaps concretos.
-Completa los gaps, edita la descripción en Jira y vuelve a ejecutar `po dor-gate`.
-No hay un número máximo de intentos.
-
-**¿El CLI puede sobrescribir trabajo mío en Jira?**  
-No — todos los comandos añaden secciones al final de la descripción existente,
-nunca la sobreescriben. Puedes editar Jira directamente y el CLI respetará tu contenido.
-
-**¿Qué pasa después del Handshake OK?**  
-El ticket pasa a estado HANDSHAKE. Ejecuta `po start-dev FP-XX` para registrar
-los leads de desarrollo y mover el ticket a EN DESARROLLO.
-
-**¿Qué pasa si el Handshake da KO?**  
-El ticket vuelve a DEFINICION. El PO resuelve los gaps identificados por el equipo
-y vuelve a ejecutar `po handshake FP-XX` cuando estén resueltos.
-
-**¿Qué pasa si la UAT da KO?**  
-El ticket vuelve a EN DESARROLLO. El lead técnico recibe en Jira el detalle completo
-de defectos y observaciones. Cuando dev corrija, se vuelve a ejecutar `po uat FP-XX`.
-
-**¿Puedo usar el CLI sin conexión a internet?**  
-`po demo --offline` simula el flujo sin crear nada en Jira ni llamar a la IA.
-Para trabajo real necesitas conexión a Jira y a la API de Anthropic.
-
-**¿Qué versión de Claude usa?**  
-`claude-sonnet-4-6` por defecto (configurable en `.env` → `CLAUDE_MODEL`).
-
-**¿La IA puede inventar información?**  
-No. Todos los prompts tienen la regla explícita "NO inventes". Cuando falta
-información, la IA deja `[PENDIENTE: ...]` en lugar de inventar. El PO siempre
-aporta el conocimiento; la IA solo estructura y mejora la forma.
-
-**¿Qué KPIs saca `po kpis` directamente de Jira y cuáles no?**  
-Extrae 10 KPIs automáticamente: % DoR cumplido, tiempos de ciclo, throughput, aging, cobertura de sign-off/handshake/UAT, adopción IA y urgencias declaradas. Los 13 KPIs restantes (GitHub, Sentry, encuestas de salud del equipo, auditorías manuales) aparecen como `N/A` con la fuente necesaria indicada.
-
-**¿Puedo pegar texto largo o con saltos de línea en las preguntas del CLI?**  
-Sí. Todos los comandos guiados usan `;;` como terminador de respuesta. Pega el
-texto que quieras (con párrafos, listas, Markdown), y cuando hayas terminado
-escribe `;;` en una línea nueva y pulsa Enter. Ver la sección
-[Cómo introducir respuestas en el CLI](#cómo-introducir-respuestas-en-el-cli).
+| `po-cerrado` | CERRADO |
+| `po-rechazado` | RECHAZADO |
+| `po-aplazado` | APLAZADO |

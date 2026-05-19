@@ -400,27 +400,30 @@ def _help_row(commands: list[tuple[str, str]]) -> None:
 def pipeline_table(rows: list[dict], project_key: str, now_str: str) -> None:
     """
     rows: list of {label, display, count, oldest, color, alerts}
+    'oldest' is the age of the oldest issue currently in that state (e.g. "3d", "2w").
     """
     table = Table(
         title=f"[bold {C_WHITE}]Pipeline — {project_key}[/bold {C_WHITE}]   [{C_MUTED}]{now_str}[/{C_MUTED}]",
+        caption=f"[{C_MUTED}]'Issue más viejo' = antigüedad del ticket más antiguo en ese estado · SLA: INTAKE >48h · SIGN-OFF >5d · DOR GATE >2d[/{C_MUTED}]",
         box=box.ROUNDED,
         show_lines=False,
         header_style=f"bold {C_MUTED}",
         padding=(0, 1),
         expand=True,
     )
-    table.add_column("Estado",       min_width=18)
-    table.add_column("Issues",       justify="right", width=8)
-    table.add_column("Más antiguo",  width=12)
-    table.add_column("Alertas")
+    table.add_column("Estado",         min_width=18)
+    table.add_column("Issues",         justify="right", width=8)
+    table.add_column("Issue más viejo", width=16)
+    table.add_column("Alertas SLA")
 
     for row in rows:
         color = row["color"]
         count = row["count"]
+        oldest_cell = f"[{C_MUTED}]{row['oldest']}[/{C_MUTED}]" if row["oldest"] else f"[{C_MUTED}]—[/{C_MUTED}]"
         table.add_row(
             f"[{color}]{row['display']}[/{color}]",
             f"[bold]{count}[/bold]" if count > 0 else f"[{C_MUTED}]—[/{C_MUTED}]",
-            f"[{C_MUTED}]{row['oldest']}[/{C_MUTED}]",
+            oldest_cell,
             row["alerts"],
         )
 

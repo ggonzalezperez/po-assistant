@@ -364,10 +364,10 @@ def compute_kpis(issues: list[JiraIssue], config: Config, weeks: int = 8) -> lis
 
 def _status_markup(status: str) -> str:
     return {
-        "ok":      "[green]OK[/green]",
-        "warning": "[yellow]~[/yellow]",
-        "alert":   "[red]KO[/red]",
-        "info":    "[cyan]->[/cyan]",
+        "ok":      "[green]✓ OK[/green]",
+        "warning": "[yellow]! ATENCIÓN[/yellow]",
+        "alert":   "[red]✗ ALERTA[/red]",
+        "info":    "[cyan]INFO[/cyan]",
         "no_data": "[dim]N/A[/dim]",
     }.get(status, "[dim]?[/dim]")
 
@@ -394,12 +394,12 @@ def _build_family_table(kpis: list[KPIResult], family: str) -> Table:
         padding=(0, 1),
         expand=True,
     )
-    table.add_column("ID",     width=6,  style="dim")
-    table.add_column("KPI",   min_width=28)
-    table.add_column("Valor", width=16, justify="right")
-    table.add_column("Obj. M3", width=18)
-    table.add_column("n",    width=6,  justify="right", style="dim")
-    table.add_column("Estado", width=8, justify="center")
+    table.add_column("ID",        width=6,  style="dim")
+    table.add_column("KPI",      min_width=28)
+    table.add_column("Valor",    width=16, justify="right")
+    table.add_column("Objetivo", width=18)
+    table.add_column("Muestra",  width=9,  justify="right", style="dim")
+    table.add_column("Estado",   width=14, justify="center")
 
     for kpi in kpis:
         if kpi.family != family:
@@ -422,6 +422,8 @@ def _build_family_table(kpis: list[KPIResult], family: str) -> Table:
 
 def print_dashboard(kpis: list[KPIResult]) -> None:
     """Render the full KPI dashboard to the terminal."""
+    from rich.rule import Rule
+
     families = ["F1", "F2", "F3", "F4", "F5", "F6"]
     for family in families:
         family_kpis = [k for k in kpis if k.family == family]
@@ -431,18 +433,43 @@ def print_dashboard(kpis: list[KPIResult]) -> None:
         console.print()
         console.print(Padding(table, (0, 2)))
 
-    # Summary line
+    # Compute groups
     total = len(kpis)
     with_data = [k for k in kpis if k.status != "no_data"]
     on_target = [k for k in with_data if k.status == "ok"]
+    alerts = [k for k in with_data if k.status == "alert"]
+    warnings = [k for k in with_data if k.status == "warning"]
     no_data_count = total - len(with_data)
 
     console.print()
-    console.print(
-        f"  [dim]Con datos: {len(with_data)}/{total}  "
-        f"·  En objetivo: {len(on_target)}/{len(with_data)}  "
-        f"·  Sin datos Jira: {no_data_count}/{total}[/dim]"
-    )
+    console.print(Rule(style="dim"))
+    console.print()
+
+    # Summary table
+    summary = Table(box=None, show_header=False, padding=(0, 2))
+    summary.add_column(width=26, style="dim")
+    summary.add_column()
+    summary.add_row("KPIs calculados de Jira", f"{len(with_data)}/{total}")
+    summary.add_row("En objetivo", f"[green]{len(on_target)}[/green]")
+    if alerts:
+        names = ", ".join(k.kpi_id for k in alerts)
+        summary.add_row("Con alerta  (ALERTA)", f"[red]{len(alerts)} — {names}[/red]")
+    if warnings:
+        names = ", ".join(k.kpi_id for k in warnings)
+        summary.add_row("Requieren atención", f"[yellow]{len(warnings)} — {names}[/yellow]")
+    summary.add_row("Sin datos Jira (N/A)", f"[dim]{no_data_count} — requieren otras fuentes[/dim]")
+    console.print(Padding(summary, (0, 2)))
+
+    # Legend
+    console.print()
+    console.print(Padding(
+        "[dim]Leyenda:  [green]✓ OK[/green] en objetivo  "
+        "[yellow]! ATENCIÓN[/yellow] por debajo del objetivo  "
+        "[red]✗ ALERTA[/red] fuera de objetivo  "
+        "[cyan]INFO[/cyan] sin objetivo fijo  "
+        "N/A sin datos Jira[/dim]",
+        (0, 4)
+    ))
     console.print()
 
 
@@ -450,10 +477,10 @@ def print_dashboard(kpis: list[KPIResult]) -> None:
 
 def _status_md(status: str) -> str:
     return {
-        "ok":      "OK",
-        "warning": "~",
-        "alert":   "KO",
-        "info":    "->",
+        "ok":      "✓ OK",
+        "warning": "! ATENCIÓN",
+        "alert":   "✗ ALERTA",
+        "info":    "INFO",
         "no_data": "N/A",
     }.get(status, "?")
 
@@ -547,7 +574,8 @@ def run(
         console.print(f"  [red]Error cargando issues de Jira: {e}[/red]")
         return
 
-    console.print(f"  [dim]{len(issues)} issues cargados[/dim]\n")
+    console.print(f"  [dim]{len(issues)} issues cargados · throughput calculado sobre las últimas {weeks} semanas[/dim]")
+    console.print(f"  [dim]Los KPIs marcados N/A requieren fuentes externas (GitHub, Sentry, encuestas)[/dim]\n")
 
     kpis = compute_kpis(issues, config, weeks=weeks)
     print_dashboard(kpis)

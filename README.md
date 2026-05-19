@@ -1,42 +1,47 @@
 # po-assistant
 
-> Asistente IA para Product Owners — Flexicar  
-> Automatiza el flujo end-to-end de definición de HUs con Claude + Jira.
+> CLI con IA para Product Owners de Flexicar.  
+> Guía el flujo completo de definición de HUs: desde la petición bruta hasta el release.
 
 ---
 
-## Qué hace
+## El problema que resuelve
 
-```
-Petición bruta  →  INTAKE  →  TRIAGE  →  DISCOVERY  →  DEFINICION
-    →  SIGN-OFF SH  →  DOR GATE  →  HANDSHAKE  →  EN DESARROLLO  →  UAT  →  RELEASE
-```
+Sin una herramienta así, el trabajo del PO es manual, inconsistente y difícil de medir:
+- Las peticiones llegan por Slack, email, llamadas y Excel, no por Jira.
+- Las HUs no siguen una plantilla, cada PO escribe lo que puede.
+- No hay registro de por qué se tomaron las decisiones.
+- Nadie sabe en qué estado está cada HU ni cuánto tiempo lleva atascada.
 
-| Comando | Paso | Qué hace |
-|---------|------|----------|
-| `po intake "texto"` | 1 — Intake | Clasifica tipo y prioridad con IA, crea ticket en Jira |
-| `po triage FP-12` | 2 — Triage | Árbol de decisión asistido: avanza, aplaza, redirige o rechaza |
-| `po discovery FP-12` | 3 — Discovery | Genera ficha de discovery guiada por preguntas del PO |
-| `po define FP-12` | 4 — Definición | Genera HU completa (6 bloques + criterios de aceptación) |
-| `po signoff FP-12` | 5 — Sign-off SH | Genera documento de sign-off para el stakeholder |
-| `po dor-gate FP-12` | 6 — DoR Gate | Valida los 12 bloques del DoR, score 0-12, gaps accionables |
-| `po handshake FP-12` | 7 — Handshake | Acta de traspaso PO → desarrollo; KO devuelve a DEFINICION |
-| `po start-dev FP-12` | 8 — En Desarrollo | Registra leads de desarrollo y mueve a EN DESARROLLO |
-| `po uat FP-12` | 9 — UAT | Registra acta de UAT; KO devuelve a EN DESARROLLO |
-| `po release FP-12` | 10 — Release | Checklist de release y cierre del ciclo |
-| `po kpis` | — | Dashboard de KPIs extraídos de Jira + exportación Markdown |
-| `po dashboard` | — | Pipeline Kanban con SLA alerts por estado |
-| `po setup` | — | Configura proyecto Jira, campos custom, workflow y tablero |
-| `po demo` | — | Demo guiada con caso real Flexicar |
+`po-assistant` convierte ese caos en un flujo guiado de 10 pasos, con IA para las partes que consumen más tiempo (clasificar, redactar, validar) y con todo documentado en Jira automáticamente.
 
 ---
 
-## Instalación rápida
+## Cómo funciona — los 10 pasos
+
+```
+1. INTAKE        →  po intake "texto"     Clasifica y crea el ticket en Jira
+2. TRIAGE        →  po triage FP-12       Decide si avanza, aplaza o se rechaza
+3. DISCOVERY     →  po discovery FP-12    Ficha de contexto con el stakeholder
+4. DEFINICION    →  po define FP-12       Genera la HU completa con IA
+5. SIGN-OFF SH   →  po signoff FP-12      Documento de alcance firmado
+6. DOR GATE      →  po dor-gate FP-12     Valida los 12 bloques del DoR con IA
+7. HANDSHAKE     →  po handshake FP-12    Acta de traspaso al equipo de dev
+8. EN DESARROLLO →  po start-dev FP-12    Registra el arranque y los leads
+9. UAT           →  po uat FP-12          Acta de validación funcional
+10. RELEASE      →  po release FP-12      Checklist de release y cierre
+```
+
+Cada paso añade un bloque fechado a la descripción del ticket en Jira. Al final, el ticket contiene la historia completa de la HU: decisiones, quién participó, qué cambió y por qué.
+
+---
+
+## Instalación
 
 ### Prerrequisitos
 
 - Python 3.11+
-- [uv](https://docs.astral.sh/uv/) (gestor de paquetes) — o pip
+- [uv](https://docs.astral.sh/uv/) (recomendado) — o pip
 - Cuenta Jira Cloud con permisos de administrador
 - API Key de Anthropic — [console.anthropic.com](https://console.anthropic.com/settings/keys)
 
@@ -55,13 +60,11 @@ python -m venv .venv
 pip install -e .
 ```
 
-### Configurar
+### Configurar `.env`
 
 ```bash
 cp .env.example .env
 ```
-
-Edita `.env` con los valores reales:
 
 ```dotenv
 JIRA_BASE_URL=https://<dominio>.atlassian.net
@@ -73,84 +76,151 @@ PO_TEAM=Ester Carrasco:ecarrasco@flexicar.es,...
 PYTHONUTF8=1
 ```
 
-### Inicializar Jira
+### Inicializar Jira (una vez)
 
 ```bash
 po setup
 ```
 
-Crea o verifica: proyecto, 5 campos custom, workflow de 10 estados, tablero Kanban y componentes del equipo.
-Los IDs de campos se escriben automáticamente en `.env`.
+Crea el proyecto FP, los 5 campos custom, el workflow de 10 estados y el tablero Kanban.
+Los IDs de campos se guardan automáticamente en `.env`.
 
-Para el paso adicional de configurar las columnas del tablero, consulta
-[`docs/guia_setup_jira_oficial.md`](docs/guia_setup_jira_oficial.md).
+Ver [`docs/guia_setup_jira_oficial.md`](docs/guia_setup_jira_oficial.md) para configurar las columnas del tablero (paso manual).
 
-### Probar
+---
+
+## Uso rápido — flujo completo de ejemplo
 
 ```bash
-po demo               # demo guiada con caso real (~2 min)
-po demo --offline     # sin crear issues en Jira
+# Una petición llega por Slack: "los agentes no encuentran cómo cancelar una reserva"
+po intake "Los agentes de tienda no encuentran cómo cancelar una reserva en el CRM"
+# → Crea FP-12 en Jira con clasificación IA (tipo: problema, prio: alta)
+
+# Comité de Triage del lunes
+po triage FP-12
+# → Decide avanzar a Discovery; documenta la decisión en Jira
+
+# PO hace discovery con María Ruiz (operaciones)
+po discovery FP-12
+# → 11 preguntas guiadas; genera ficha de contexto en Jira
+
+# PO redacta la HU con IA
+po define FP-12
+# → HU completa en 6 bloques; queda en la descripción de FP-12
+
+# Sign-off formal del alcance con María
+po signoff FP-12
+# → Documento de alcance; María confirma en Jira
+
+# Validar que la HU está lista para desarrollo
+po dor-gate FP-12
+# → Score 11/12 OK → estado DOR GATE
+
+# Reunión de traspaso con el equipo técnico
+po handshake FP-12
+# → Acta con estimación, riesgos y dependencias; estado HANDSHAKE
+
+# El sprint arranca
+po start-dev FP-12
+# → Registra los leads y mueve a EN DESARROLLO
+
+# Validación funcional con el negocio
+po uat FP-12
+# → Acta de UAT firmada; estado UAT
+
+# Deploy a producción
+po release FP-12
+# → Checklist de release; estado RELEASE
 ```
 
 ---
 
-## Uso diario
+## Comandos de análisis y gestión
 
 ```bash
-# Nueva petición recibida
-po intake "Los agentes no encuentran cómo cancelar una reserva en el CRM"
-# → Crea FP-12 en INTAKE con clasificación IA
-
-# Comité de Triage — decidir qué avanza
-po triage FP-12
-# → 5 opciones: redirigir, urgencia, devolver, discovery, aplazar
-# → Transitions: discovery → TRIAGE | aplazar → APLAZADO | resto → RECHAZADO
-
-# Discovery con el stakeholder — ficha guiada
-po discovery FP-12
-# → 11 preguntas guiadas; genera ficha de contexto en Jira
-
-# Tras el discovery, generar HU
-po define FP-12
-po define FP-12 --notes notas_reunion.txt  # con notas de la reunión
-
-# Sign-off del stakeholder — documento formal de alcance
-po signoff FP-12
-# → Genera documento de sign-off; stakeholder confirma en Jira
-
-# Validar si la HU está lista para desarrollo
-po dor-gate FP-12
-# → Score 11/12 OK → pasa a DOR GATE
-# → Score 8/12 KO  → vuelve a DEFINICION con gaps detallados
-
-# Handshake con el equipo de desarrollo
-po handshake FP-12
-# → Acta de traspaso: estimación, riesgos, dependencias
-# → OK → HANDSHAKE | KO (gaps) → vuelve a DEFINICION
-
-# Arrancar el desarrollo formalmente
-po start-dev FP-12
-# → Registra los leads de desarrollo
-# → Mueve a EN DESARROLLO (HU ya visible en sección DEFINICION)
-
-# Registro de UAT
-po uat FP-12
-# → Acta de validación funcional
-# → OK/condicional → UAT | KO → vuelve a EN DESARROLLO
-
-# Release y cierre del ciclo
-po release FP-12
-# → Checklist de release; transitions a RELEASE
-
-# KPIs del pipeline
+# KPIs del pipeline (extraídos de Jira automáticamente)
 po kpis                    # dashboard en terminal
-po kpis --export           # + exportar a Markdown (YYYY-MM-DD-kpis-FP.md)
-po kpis --out informe.md   # exportar con nombre específico
+po kpis --export           # exportar a Markdown (YYYY-MM-DD-kpis-FP.md)
 
-# Revisar el pipeline
-po dashboard
-po dashboard --po ester   # filtrar por PO
-po dashboard --all        # incluir cerrados
+# Visión global del pipeline
+po dashboard               # todos los issues por estado con SLA alerts
+po dashboard --po ester    # filtrar por PO
+po dashboard --all         # incluir cerrados y rechazados
+```
+
+---
+
+## Todos los comandos
+
+| Paso | Comando | Qué hace |
+|------|---------|----------|
+| 1 | `po intake "texto"` | Clasifica la petición con IA y crea el ticket |
+| 2 | `po triage FP-12` | Árbol de decisión: avanza, aplaza, redirige o rechaza |
+| 3 | `po discovery FP-12` | 11 preguntas guiadas para completar el contexto |
+| 4 | `po define FP-12` | Genera la HU completa (6 bloques) con IA |
+| 5 | `po signoff FP-12` | Documento formal de alcance para el stakeholder |
+| 6 | `po dor-gate FP-12` | Valida 12 bloques DoR con IA; score y gaps accionables |
+| 7 | `po handshake FP-12` | Acta de traspaso PO → dev; si hay gaps, vuelve a Definición |
+| 8 | `po start-dev FP-12` | Registra leads y mueve a EN DESARROLLO |
+| 9 | `po uat FP-12` | Acta de UAT; si falla, vuelve a EN DESARROLLO |
+| 10 | `po release FP-12` | Checklist de release y cierre del ciclo |
+| — | `po kpis` | Dashboard de KPIs extraídos de Jira |
+| — | `po dashboard` | Pipeline Kanban con antigüedad y SLA alerts |
+| — | `po setup` | Configura Jira: proyecto, campos, workflow, tablero |
+| — | `po demo` | Demo guiada con caso real Flexicar (~2 min) |
+
+---
+
+## Cómo crece la descripción del ticket
+
+Ningún comando sobreescribe la descripción. Cada uno añade un bloque al final,
+separado por una línea horizontal. Al final del ciclo, el ticket es un registro
+completo de todo lo que pasó:
+
+```
+## INTAKE — 2026-05-18
+Clasificación IA: problema · prioridad alta
+Preguntas para el triage: ¿Afecta a todas las tiendas?...
+
+---
+
+## TRIAGE — 2026-05-19
+Decisión: avanza a Discovery. PO asignado: Ester Carrasco.
+
+---
+
+## DISCOVERY — 2026-05-20
+Ficha de contexto: stakeholder, frecuencia, solución actual...
+
+---
+
+## DEFINICION — 2026-05-21
+HU completa: contexto, criterios de aceptación, plan UAT...
+
+---
+
+## SIGN-OFF SH — 2026-05-22
+Alcance acordado con María Ruiz. MVP: cancelación en 1 clic.
+
+---
+
+## HANDSHAKE — 2026-05-23
+Estimación: 5 puntos. Riesgos: integración con JATO.
+
+---
+
+## EN DESARROLLO — 2026-05-24
+Lead: Carlos López — Backend.
+
+---
+
+## UAT — 2026-05-30
+Validador: María Ruiz. Resultado: OK sin defectos.
+
+---
+
+## RELEASE — 2026-05-31
+Deploy: 2026-05-31. Checklist completo. Comunicado al negocio.
 ```
 
 ---
@@ -160,129 +230,33 @@ po dashboard --all        # incluir cerrados
 ```
 po-assistant/
 ├── src/po_assistant/
-│   ├── main.py              # CLI — comandos Typer
+│   ├── main.py              # CLI — registro de comandos Typer
 │   ├── config.py            # Configuración desde .env
 │   ├── jira_client.py       # Jira REST API v3 + Agile API
 │   ├── ai_client.py         # Anthropic SDK (Claude)
 │   ├── models.py            # Tipos: POEstado, DorGateResult…
 │   ├── display.py           # UI terminal con Rich
 │   ├── workflow/
-│   │   ├── qa.py            # Q&A helpers compartidos (ask, append_section…)
-│   │   ├── intake.py        # Clasificación + creación de issue
-│   │   ├── triage.py        # Árbol de decisión de triage
-│   │   ├── discovery.py     # Ficha de discovery guiada
-│   │   ├── definition.py    # Generación HU 6 bloques
-│   │   ├── dor_gate.py      # Validación 12 bloques DoR
-│   │   ├── signoff.py       # Documento de sign-off stakeholder
-│   │   ├── handshake.py     # Acta de handshake PO → dev
-│   │   ├── start_dev.py     # Arranque formal de desarrollo → EN DESARROLLO
-│   │   ├── kpis.py          # KPI dashboard + exportación Markdown
-│   │   ├── uat.py           # Acta de UAT
-│   │   └── release.py       # Checklist de release
-│   ├── prompts/             # System prompts para Claude (.md)
-│   │   ├── intake_classify.md
-│   │   ├── triage_decide.md
-│   │   ├── discovery_ficha.md
-│   │   ├── definition_draft_hu.md
-│   │   ├── dor_validate.md
-│   │   ├── signoff_doc.md
-│   │   ├── handshake_acta.md
-│   │   ├── uat_acta.md
-│   │   └── release_check.md
-│   └── templates/
-│       └── hu_template.md   # Plantilla de referencia
+│   │   ├── qa.py            # Helpers compartidos: ask(), append_section()…
+│   │   ├── intake.py        # Paso 1 — Clasificación + creación
+│   │   ├── triage.py        # Paso 2 — Árbol de decisión
+│   │   ├── discovery.py     # Paso 3 — Ficha de discovery
+│   │   ├── definition.py    # Paso 4 — Generación HU con IA
+│   │   ├── signoff.py       # Paso 5 — Documento de sign-off
+│   │   ├── dor_gate.py      # Paso 6 — Validación DoR con IA
+│   │   ├── handshake.py     # Paso 7 — Acta de handshake
+│   │   ├── start_dev.py     # Paso 8 — Arranque de desarrollo
+│   │   ├── uat.py           # Paso 9 — Acta de UAT
+│   │   ├── release.py       # Paso 10 — Checklist de release
+│   │   └── kpis.py          # Dashboard KPIs + exportación Markdown
+│   └── prompts/             # System prompts para Claude (.md)
 ├── docs/
-│   ├── guia_setup_jira_oficial.md   # Setup Jira corporativo paso a paso
-│   ├── prompt_setup_jira.md         # Prompt IA para automatizar el setup
-│   └── manual_usuario_jira.md       # Manual de uso diario para POs
+│   ├── manual_usuario_jira.md       # Manual de uso diario para POs
+│   ├── guia_setup_jira_oficial.md   # Configuración Jira corporativo
+│   └── prompt_setup_jira.md         # Prompt IA para automatizar el setup
 ├── tests/
-│   ├── test_qa_helpers.py
-│   ├── test_triage.py
-│   ├── test_discovery.py
-│   └── test_dor_gate.py
-├── JIRA_SETUP.md            # Referencia rápida de configuración Jira
 ├── .env.example
 └── pyproject.toml
-```
-
----
-
-## Cómo funciona internamente — descripción acumulativa
-
-Cada comando añade un bloque `## ESTADO — YYYY-MM-DD` a la descripción del ticket
-en Jira, separado por `---`. La descripción nunca se sobreescribe: la historia
-completa del ticket queda visible.
-
-```
-## INTAKE — 2026-05-18
-[análisis IA de la petición original]
-
----
-
-## TRIAGE — 2026-05-19
-[decisión del comité + justificación]
-
----
-
-## DISCOVERY — 2026-05-20
-[ficha de contexto, stakeholders, viabilidad]
-
----
-
-## DEFINICION — 2026-05-21
-[HU completa: 6 bloques + criterios de aceptación]
-
----
-
-## SIGN-OFF SH — 2026-05-22
-[documento de alcance firmado por el stakeholder]
-
----
-
-## HANDSHAKE — 2026-05-23
-[acta de traspaso: estimación, riesgos, dependencias]
-
----
-
-## EN DESARROLLO — 2026-05-24
-[leads de desarrollo]
-…
-```
-
----
-
-## Configuración Jira — resumen técnico
-
-`po setup` configura automáticamente:
-
-| Qué | API usada |
-|-----|-----------|
-| Proyecto Kanban | `POST /rest/api/3/project` |
-| 10 estados globales (INTAKE → RELEASE) | `POST /rest/api/3/statuses` |
-| Workflow con transiciones globales | `POST /rest/api/3/workflows/create` |
-| Asignación workflow al proyecto | `PUT /rest/api/2/workflowscheme/{id}/draft` |
-| 5 campos custom (DoR Score, DoR Gaps…) | `POST /rest/api/3/field` |
-| Tablero Kanban + filtros rápidos | `POST /rest/agile/1.0/board` |
-| Componentes del equipo PO | `POST /rest/api/3/component` |
-
-Las columnas del tablero requieren un paso manual (ver
-[`docs/guia_setup_jira_oficial.md`](docs/guia_setup_jira_oficial.md)) porque
-la API pública de Jira Free devuelve 405 en ese endpoint. Se usan las DevTools
-del navegador con el API interno de Greenhopper.
-
----
-
-## Entornos
-
-```bash
-# Prototipo personal
-cp .env.example .env
-# → JIRA_BASE_URL=https://gerx97.atlassian.net
-
-# Producción Flexicar
-cp .env.example .env
-# → JIRA_BASE_URL=https://flexicar.atlassian.net
-# → JIRA_PO_PROJECT_KEY=<CLAVE_CORPORATIVA>
 ```
 
 ---
@@ -291,19 +265,17 @@ cp .env.example .env
 
 ```bash
 uv run pytest tests/ -v
-# o: pip install -e ".[dev]" && pytest tests/ -v
 ```
 
 ---
 
-## Documentación
+## Documentación completa
 
-| Documento | Contenido |
-|-----------|-----------|
-| [`docs/guia_setup_jira_oficial.md`](docs/guia_setup_jira_oficial.md) | Guía completa para configurar el Jira corporativo |
-| [`docs/prompt_setup_jira.md`](docs/prompt_setup_jira.md) | Prompt para que una IA ejecute el setup automáticamente |
-| [`docs/manual_usuario_jira.md`](docs/manual_usuario_jira.md) | Manual de uso diario para Product Owners |
-| [`JIRA_SETUP.md`](JIRA_SETUP.md) | Referencia rápida de campos, estados y troubleshooting |
+| Documento | Para quién | Contenido |
+|-----------|-----------|-----------|
+| [`docs/manual_usuario_jira.md`](docs/manual_usuario_jira.md) | POs | Guía de uso día a día con todos los comandos |
+| [`docs/guia_setup_jira_oficial.md`](docs/guia_setup_jira_oficial.md) | Admin Jira | Configuración paso a paso del entorno corporativo |
+| [`JIRA_SETUP.md`](JIRA_SETUP.md) | Técnico | Referencia rápida de campos, estados y troubleshooting |
 
 ---
 

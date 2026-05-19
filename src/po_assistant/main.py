@@ -484,11 +484,17 @@ def dashboard(
     pipeline_table(rows, config.jira_po_project_key,
                    now.strftime("%Y-%m-%d %H:%M UTC"))
 
-    total = len(issues)
-    done  = len(by_estado.get(POEstado.CERRADO.value, []))
-    console.print(f"  [{C_MUTED}]Total: {total}  ·  Cerrados: {done}[/{C_MUTED}]")
+    total    = len(issues)
+    done     = len(by_estado.get(POEstado.CERRADO.value, []))
+    rejected = len(by_estado.get(POEstado.RECHAZADO.value, []))
+    in_dev   = len(by_estado.get(POEstado.EN_DESARROLLO.value, []))
+    active   = sum(len(by_estado.get(e.value, [])) for e in ESTADO_ORDER)
+    console.print(
+        f"  [{C_MUTED}]Total: {total}  ·  Activos en pipeline: {active}  "
+        f"·  En desarrollo: {in_dev}  ·  Cerrados: {done}  ·  Rechazados: {rejected}[/{C_MUTED}]"
+    )
     if no_estado:
-        console.print(f"  [{C_MUTED}]{len(no_estado)} issue(s) sin etiqueta po-*[/{C_MUTED}]")
+        console.print(f"  [{C_MUTED}]{len(no_estado)} issue(s) sin etiqueta po-* (fuera del pipeline)[/{C_MUTED}]")
     console.print()
 
     _help_row([
