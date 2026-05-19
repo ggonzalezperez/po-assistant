@@ -99,3 +99,12 @@ def test_build_description_has_date_header():
     desc = _build_description(result, "t", "a", "d", "e")
     import re
     assert re.search(r"## URGENCIA — \d{4}-\d{2}-\d{2}", desc)
+
+
+def test_urgencia_command_registered():
+    from typer.testing import CliRunner
+    from po_assistant.main import app
+    runner = CliRunner()
+    result = runner.invoke(app, ["urgencia", "--help"])
+    assert result.exit_code == 0
+    assert "urgencia" in result.output.lower() or "urgenc" in result.output.lower()

@@ -15,6 +15,7 @@ from .display import (
     console, app_header, step_bar, section_rule,
     notify_success, notify_warning, notify_error,
     pipeline_table, dashboard_estado_block, dashboard_summary_panel,
+    urgencia_card,
     demo_welcome, demo_scenario_card, demo_summary,
     _help_row, C_MUTED, C_ACCENT, C_PRIMARY, C_SUCCESS, C_ERROR,
     ICON_ARROW,
@@ -264,6 +265,25 @@ def intake(
     app_header("Paso 1 — Intake")
     config, jira, ai = _clients()
     from .workflow import intake as wf
+    wf.run(text, ai, jira, config)
+
+
+# ── URGENCIA ─────────────────────────────────────────────────────────────────
+
+@app.command()
+def urgencia(
+    text: str = typer.Argument(..., help="Descripción del problema en producción"),
+):
+    """
+    [bold]Urgencia[/bold] — Flujo abreviado para incidencias en producción.
+
+    Crea el ticket con brief IA y lo mueve directamente a [bold]EN DESARROLLO[/bold].
+    Pasos omitidos: TRIAGE · DISCOVERY · DEFINICIÓN · SIGN-OFF · DOR GATE · HANDSHAKE.
+    Continúa con: [bold cyan]po uat FP-X[/bold cyan] y [bold cyan]po release FP-X[/bold cyan].
+    """
+    app_header("Urgencia — Flujo abreviado")
+    config, jira, ai = _clients()
+    from .workflow import urgencia as wf
     wf.run(text, ai, jira, config)
 
 
