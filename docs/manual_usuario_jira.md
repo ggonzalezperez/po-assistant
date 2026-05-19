@@ -528,6 +528,9 @@ No. Todos los prompts tienen la regla explícita "NO inventes". Cuando falta
 información, la IA deja `[PENDIENTE: ...]` en lugar de inventar. El PO siempre
 aporta el conocimiento; la IA solo estructura y mejora la forma.
 
+**¿Qué KPIs saca `po kpis` directamente de Jira y cuáles no?**  
+Extrae 10 KPIs automáticamente: % DoR cumplido, tiempos de ciclo, throughput, aging, cobertura de sign-off/handshake/UAT, adopción IA y urgencias declaradas. Los 13 KPIs restantes (GitHub, Sentry, encuestas de salud del equipo, auditorías manuales) aparecen como `N/A` con la fuente necesaria indicada.
+
 **¿Puedo pegar texto largo o con saltos de línea en las preguntas del CLI?**  
 Sí. Todos los comandos guiados usan `;;` como terminador de respuesta. Pega el
 texto que quieras (con párrafos, listas, Markdown), y cuando hayas terminado

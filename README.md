@@ -18,8 +18,8 @@ Petición bruta  →  INTAKE  →  TRIAGE  →  DISCOVERY  →  DEFINICION
 | `po triage FP-12` | 2 — Triage | Árbol de decisión asistido: avanza, aplaza, redirige o rechaza |
 | `po discovery FP-12` | 3 — Discovery | Genera ficha de discovery guiada por preguntas del PO |
 | `po define FP-12` | 4 — Definición | Genera HU completa (6 bloques + criterios de aceptación) |
-| `po dor-gate FP-12` | 6 — DoR Gate | Valida los 12 bloques del DoR, score 0-12, gaps accionables |
 | `po signoff FP-12` | 5 — Sign-off SH | Genera documento de sign-off para el stakeholder |
+| `po dor-gate FP-12` | 6 — DoR Gate | Valida los 12 bloques del DoR, score 0-12, gaps accionables |
 | `po handshake FP-12` | 7 — Handshake | Acta de traspaso PO → desarrollo; KO devuelve a DEFINICION |
 | `po start-dev FP-12` | 8 — En Desarrollo | Registra leads de desarrollo y mueve a EN DESARROLLO |
 | `po uat FP-12` | 9 — UAT | Registra acta de UAT; KO devuelve a EN DESARROLLO |
@@ -114,14 +114,14 @@ po discovery FP-12
 po define FP-12
 po define FP-12 --notes notas_reunion.txt  # con notas de la reunión
 
+# Sign-off del stakeholder — documento formal de alcance
+po signoff FP-12
+# → Genera documento de sign-off; stakeholder confirma en Jira
+
 # Validar si la HU está lista para desarrollo
 po dor-gate FP-12
 # → Score 11/12 OK → pasa a DOR GATE
 # → Score 8/12 KO  → vuelve a DEFINICION con gaps detallados
-
-# Sign-off del stakeholder — documento formal de alcance
-po signoff FP-12
-# → Genera documento de sign-off; stakeholder confirma en Jira
 
 # Handshake con el equipo de desarrollo
 po handshake FP-12
