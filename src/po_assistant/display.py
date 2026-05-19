@@ -442,53 +442,58 @@ def dashboard_summary_panel(
     pipeline_counts: list[tuple[str, str, int]],  # (display_name, color, count)
 ) -> None:
     """Render the top-of-dashboard summary panel with key metrics and mini pipeline."""
-    # ── Key metrics row ────────────────────────────────────────────────────────
-    metrics = Table(box=None, show_header=False, padding=(0, 2))
-    metrics.add_column(style=C_MUTED,   width=22)
-    metrics.add_column(style="bold white", width=6)
-    metrics.add_column(style=C_MUTED,   width=22)
-    metrics.add_column(style="bold white", width=6)
-    metrics.add_column(style=C_MUTED,   width=22)
-    metrics.add_column(
-        style=("bold red" if sla_alerts > 0 else "bold white"), width=6
-    )
-    metrics.add_column(style=C_MUTED,   width=22)
-    metrics.add_column(
-        style=("bold yellow" if unassigned > 0 else "bold white"), width=6
+    # ── Key metrics: número grande + etiqueta debajo ───────────────────────────
+    metrics = Table(box=None, show_header=False, padding=(0, 3), expand=True)
+    metrics.add_column(justify="center")
+    metrics.add_column(justify="center")
+    metrics.add_column(justify="center")
+    metrics.add_column(justify="center")
+
+    sla_style   = "bold red"    if sla_alerts > 0 else "bold white"
+    unas_style  = "bold yellow" if unassigned > 0 else "bold white"
+    sla_prefix  = "⚠ "         if sla_alerts > 0 else ""
+    unas_prefix = "! "          if unassigned > 0 else ""
+
+    metrics.add_row(
+        f"[bold white]{active}[/bold white]",
+        f"[bold white]{in_dev}[/bold white]",
+        f"[{sla_style}]{sla_prefix}{sla_alerts}[/{sla_style}]",
+        f"[{unas_style}]{unas_prefix}{unassigned}[/{unas_style}]",
     )
     metrics.add_row(
-        "Activos en pipeline",  str(active),
-        "En desarrollo",        str(in_dev),
-        "SLA en alerta",        str(sla_alerts),
-        "Sin asignar",          str(unassigned),
+        f"[{C_MUTED}]activos en pipeline[/{C_MUTED}]",
+        f"[{C_MUTED}]en desarrollo[/{C_MUTED}]",
+        f"[{C_MUTED}]SLA en alerta[/{C_MUTED}]",
+        f"[{C_MUTED}]sin asignar[/{C_MUTED}]",
     )
 
-    # ── Mini pipeline bar ──────────────────────────────────────────────────────
-    pipeline_parts: list[str] = []
-    for name, color, count in pipeline_counts:
-        short = name[:3] if len(name) > 3 else name  # abbreviate for space
+    # ── Mini pipeline: dos filas de 5 estados ─────────────────────────────────
+    def _state_cell(name: str, color: str, count: int) -> str:
         if count > 0:
-            pipeline_parts.append(
-                f"[bold {color}]{name}[/bold {color}] [{color}]{count}[/{color}]"
-            )
-        else:
-            pipeline_parts.append(f"[{C_MUTED}]{name} 0[/{C_MUTED}]")
+            return f"[{color}]{name}[/{color}] [bold {color}]{count}[/bold {color}]"
+        return f"[{C_MUTED}]{name} —[/{C_MUTED}]"
 
-    separator = f"  [{C_MUTED}]·[/{C_MUTED}]  "
-    pipeline_line = separator.join(pipeline_parts)
+    row1 = pipeline_counts[:5]
+    row2 = pipeline_counts[5:]
+
+    pipeline_table_inner = Table(box=None, show_header=False, padding=(0, 2), expand=True)
+    for _ in range(5):
+        pipeline_table_inner.add_column(justify="left")
+    pipeline_table_inner.add_row(*[_state_cell(n, c, v) for n, c, v in row1])
+    pipeline_table_inner.add_row(*[_state_cell(n, c, v) for n, c, v in row2])
 
     content = Group(
         Padding(metrics, (0, 0)),
-        Padding(Text(""), (0, 0)),
-        Padding(Text.from_markup(pipeline_line), (0, 2)),
+        Padding(Rule(style=C_MUTED), (1, 0, 0, 0)),
+        Padding(pipeline_table_inner, (1, 0)),
     )
 
     console.print(Panel(
         content,
         title=f"[bold {C_WHITE}]Pipeline {project_key}[/bold {C_WHITE}]   [{C_MUTED}]{now_str}[/{C_MUTED}]",
-        border_style=C_MUTED,
+        border_style=C_PRIMARY,
         box=box.ROUNDED,
-        padding=(1, 1),
+        padding=(1, 2),
     ))
     console.print()
 

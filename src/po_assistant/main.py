@@ -663,7 +663,10 @@ def _export_dashboard_md(
 ) -> Path:
     from datetime import date as _date
     today_str = _date.today().isoformat()
-    output = Path(f"{today_str}-dashboard-{project_key}.md")
+
+    reports_dir = Path("reports")
+    reports_dir.mkdir(exist_ok=True)
+    output = reports_dir / f"{today_str}-dashboard-{project_key}.md"
 
     SLA_LABELS_MD = {
         POEstado.INTAKE:      ">48h",
@@ -671,11 +674,13 @@ def _export_dashboard_md(
         POEstado.DOR_GATE:    ">2 días",
     }
 
-    # Compute summary metrics for the Markdown header
-    md_active    = sum(len(issues_by_estado.get(e.value, [])) for e in ESTADO_ORDER)
-    md_in_dev    = len(issues_by_estado.get(POEstado.EN_DESARROLLO.value, []))
-    md_sla       = 0
+    # ── Métricas ──────────────────────────────────────────────────────────────
+    md_active     = sum(len(issues_by_estado.get(e.value, [])) for e in ESTADO_ORDER)
+    md_in_dev     = len(issues_by_estado.get(POEstado.EN_DESARROLLO.value, []))
+    md_sla        = 0
     md_unassigned = 0
+    sla_issues: list[str] = []
+
     for estado in ESTADO_ORDER:
         for issue in issues_by_estado.get(estado.value, []):
             if not issue.assignee:
@@ -685,79 +690,104 @@ def _export_dashboard_md(
                 dt = _parse_date(issue.created)
                 if dt and (now - dt).total_seconds() / 3600 > max_h:
                     md_sla += 1
+                    age = _fmt_age(now - dt)
+                    lbl = estado.display if hasattr(estado, "display") else estado.value.upper()
+                    sla_issues.append(
+                        f"| {issue.key} | {lbl} | {issue.summary} | {age} | "
+                        f"{issue.assignee or 'sin asignar'} |"
+                    )
+
+    # ── Distribución ──────────────────────────────────────────────────────────
+    dist_rows: list[str] = []
+    for estado in ESTADO_ORDER:
+        lbl  = estado.display if hasattr(estado, "display") else estado.value.upper()
+        cnt  = len(issues_by_estado.get(estado.value, []))
+        sla  = SLA_LABELS_MD.get(estado, "—")
+        dist_rows.append(f"| {lbl} | {cnt} | {sla} |")
 
     lines: list[str] = [
         f"# Pipeline PO — {project_key}",
         f"",
-        f"> Fecha: {today_str}",
+        f"> **Fecha:** {today_str}  ·  Generado con po-assistant",
         f"",
-        f"## Resumen",
+        f"---",
+        f"",
+        f"## Resumen ejecutivo",
         f"",
         f"| Métrica | Valor |",
-        f"|---------|-------|",
-        f"| Activos en pipeline | {md_active} |",
-        f"| En desarrollo | {md_in_dev} |",
-        f"| SLA en alerta | {'⚠ ' + str(md_sla) if md_sla else str(md_sla)} |",
-        f"| Sin asignar | {md_unassigned} |",
+        f"|:--------|------:|",
+        f"| Activos en pipeline | **{md_active}** |",
+        f"| En desarrollo | **{md_in_dev}** |",
+        f"| SLA en alerta | {'**⚠ ' + str(md_sla) + '**' if md_sla else str(md_sla)} |",
+        f"| Sin asignar | {'**' + str(md_unassigned) + '**' if md_unassigned else str(md_unassigned)} |",
         f"",
         f"### Distribución por estado",
         f"",
+        f"| Estado | Issues | SLA |",
+        f"|:-------|-------:|:----|",
+    ] + dist_rows + [""]
+
+    # ── Alertas SLA ───────────────────────────────────────────────────────────
+    if sla_issues:
+        lines += [
+            f"## ⚠ Alertas SLA ({md_sla})",
+            f"",
+            f"> Tickets que llevan más tiempo del límite permitido en su estado actual.",
+            f"",
+            f"| Ticket | Estado | Descripción | Tiempo | Asignado |",
+            f"|--------|--------|-------------|--------|----------|",
+        ] + sla_issues + [""]
+
+    # ── Detalle por estado (solo estados con issues) ───────────────────────────
+    lines += [
+        f"---",
+        f"",
+        f"## Detalle por estado",
+        f"",
     ]
 
-    for estado in ESTADO_ORDER:
-        lbl = estado.display if hasattr(estado, "display") else estado.value.upper()
-        cnt = len(issues_by_estado.get(estado.value, []))
-        bar = "█" * cnt if cnt > 0 else "—"
-        lines.append(f"- **{lbl}**: {cnt}  {bar}")
-    lines.append("")
-
-    total_active = 0
     for estado in visible_estados:
         issues_in = issues_by_estado.get(estado.value, [])
-        label = estado.display if hasattr(estado, "display") else estado.value.upper()
-        sla_label = SLA_LABELS_MD.get(estado, "")
-        n = len(issues_in)
-        total_active += n
-
-        sla_suffix = f" · SLA {sla_label}" if sla_label else ""
-        lines.append(f"## {label}  ({n} issues{sla_suffix})")
-        lines.append("")
-
-        if n == 0:
-            lines.append("_vacío_")
-            lines.append("")
+        if not issues_in:
             continue
 
-        lines.append("| Ticket | Tipo | Descripción | Edad | Asignado | Informador |")
-        lines.append("|--------|------|-------------|------|----------|------------|")
+        label     = estado.display if hasattr(estado, "display") else estado.value.upper()
+        sla_label = SLA_LABELS_MD.get(estado, "")
+        n         = len(issues_in)
+        sla_note  = f" · SLA {sla_label}" if sla_label else ""
 
-        sorted_issues = sorted(issues_in, key=lambda x: x.created)
-        for issue in sorted_issues:
-            tipo = ""
-            for lbl in (issue.labels or []):
-                if lbl.startswith("tipo:"):
-                    tipo = lbl[len("tipo:"):]
-                    break
+        lines += [
+            f"### {label} — {n} issue{'s' if n != 1 else ''}{sla_note}",
+            f"",
+            f"| Ticket | Tipo | Descripción | Edad | Asignado | Informador |",
+            f"|:-------|:-----|:------------|-----:|:---------|:-----------|",
+        ]
 
-            dt = _parse_date(issue.created)
-            age = _fmt_age(now - dt) if dt else "?"
+        for issue in sorted(issues_in, key=lambda x: x.created):
+            tipo = next(
+                (lbl[5:] for lbl in (issue.labels or []) if lbl.startswith("tipo:")), ""
+            )
+            dt      = _parse_date(issue.created)
+            age     = _fmt_age(now - dt) if dt else "?"
+            sla_h   = SLA_HOURS.get(estado)
+            sla_tag = " ⚠" if sla_h and dt and (now - dt).total_seconds() / 3600 > sla_h else ""
 
-            sla_h = SLA_HOURS.get(estado)
-            sla_flag = ""
-            if sla_h and dt and (now - dt).total_seconds() / 3600 > sla_h:
-                sla_flag = " ⚠"
-
-            summary = issue.summary.replace("|", "\\|")
+            summary  = issue.summary.replace("|", "\\|")
             assignee = (issue.assignee or "sin asignar").replace("|", "\\|")
             reporter = (issue.reporter or "—").replace("|", "\\|")
-            tipo_md = f"[{tipo.upper()}]" if tipo else "—"
+            tipo_md  = f"`{tipo.upper()}`" if tipo else "—"
 
-            lines.append(f"| {issue.key} | {tipo_md} | {summary} | {age}{sla_flag} | {assignee} | {reporter} |")
+            lines.append(
+                f"| {issue.key} | {tipo_md} | {summary} | {age}{sla_tag} | {assignee} | {reporter} |"
+            )
 
         lines.append("")
 
-    lines.append("---")
-    lines.append(f"*Generado con po-assistant · {today_str}*")
+    lines += [
+        f"---",
+        f"",
+        f"*Generado con po-assistant · {today_str}*",
+    ]
 
     output.write_text("\n".join(lines), encoding="utf-8")
     return output

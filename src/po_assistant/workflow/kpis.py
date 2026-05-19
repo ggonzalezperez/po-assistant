@@ -497,7 +497,9 @@ def export_markdown(kpis: list[KPIResult], project_key: str, output: Optional[Pa
     """Generate a Markdown KPI report and write it to disk. Returns the file path."""
     today_str = date.today().isoformat()
     if output is None:
-        output = Path(f"{today_str}-kpis-{project_key}.md")
+        reports_dir = Path("reports")
+        reports_dir.mkdir(exist_ok=True)
+        output = reports_dir / f"{today_str}-kpis-{project_key}.md"
 
     with_data = [k for k in kpis if k.status != "no_data"]
     ok_count = sum(1 for k in with_data if k.status == "ok")
