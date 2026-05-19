@@ -70,7 +70,10 @@ def run(text: str, ai: AIClient, jira: JiraClient, config: Config) -> str:
     key = issue.get("key", "FP-DRY")
 
     if config.fields.ia_asistida:
-        jira.update_issue(key, {config.fields.ia_asistida: "Sí"})
+        try:
+            jira.update_issue(key, {config.fields.ia_asistida: "Sí"})
+        except Exception:
+            pass  # campo no visible en la pantalla del proyecto — no bloquea el flujo
 
     jira.add_comment(
         key,
