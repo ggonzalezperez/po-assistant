@@ -172,6 +172,44 @@ def intake_card(
     console.print()
 
 
+def urgencia_card(
+    titulo: str,
+    descripcion: str,
+    impacto: str,
+    causa_probable: str,
+    accion_correctiva: str,
+    rollback: str,
+    checks: list[str],
+    issue_key: str = "",
+) -> None:
+    """Full-width card for a production urgency AI brief."""
+    badges = Text()
+    badges.append("  URGENCIA  ", style="bold white on red")
+    badges.append("   ")
+    badges.append("  ▲ ALTA  ", style=f"bold {C_ERROR} on grey15")
+    if issue_key:
+        badges.append(f"   [{C_MUTED}]{issue_key}[/{C_MUTED}]")
+
+    title_text = Text(f"\n  {titulo}\n", style="bold white")
+
+    brief = Table(box=None, show_header=False, padding=(0, 1), expand=True)
+    brief.add_column(style=C_MUTED, width=28)
+    brief.add_column()
+    brief.add_row("Impacto:",           impacto)
+    brief.add_row("Causa probable:",    causa_probable)
+    brief.add_row("Acción correctiva:", accion_correctiva)
+    brief.add_row("Plan de rollback:",  rollback)
+
+    content = Group(badges, title_text, brief)
+    console.print(Panel(content, border_style=C_ERROR, box=box.ROUNDED, padding=(1, 1)))
+
+    if checks:
+        console.print(f"  [{C_ACCENT}]{ICON_SPARK} Checks de verificación:[/{C_ACCENT}]")
+        for i, check in enumerate(checks, 1):
+            console.print(f"  [{C_MUTED}]  {i}.[/{C_MUTED}] {check}")
+    console.print()
+
+
 # ── HU preview ───────────────────────────────────────────────────────────────
 
 def hu_preview(hu_text: str, issue_key: str) -> None:

@@ -18,3 +18,8 @@ def test_urgencia_result_instantiation():
     assert r.titulo == "[CRM] Resolver fallo en envío de pedidos"
     assert r.prioridad_sugerida == "Alta"
     assert len(r.checks_verificacion) == 2
+
+
+def test_urgencia_card_importable():
+    from po_assistant.display import urgencia_card
+    assert callable(urgencia_card)
