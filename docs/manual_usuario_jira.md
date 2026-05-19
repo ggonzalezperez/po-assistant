@@ -692,14 +692,15 @@ El pipeline de HUs genera datos valiosos que están dispersos en Jira: tiempos d
 
 ```bash
 po kpis                        # dashboard en terminal
-po kpis --export               # + exportar a Markdown (YYYY-MM-DD-kpis-FP.md)
-po kpis --out informe.md       # nombre de archivo personalizado
-po kpis --weeks 12             # throughput de las últimas 12 semanas (defecto: 4)
+po kpis --export               # + exportar a reports/YYYY-MM-DD-kpis-FP.md
+po kpis --out informe.md       # ruta de archivo personalizada
+po kpis --weeks 12             # throughput de las últimas 12 semanas (defecto: 8)
 ```
 
 **Qué muestra**
 
-Los KPIs se agrupan en 6 familias. Los que pueden calcularse directamente de Jira se muestran con valor real; los demás muestran `N/A` con la fuente donde buscarlos:
+Los KPIs se agrupan en 6 familias con indicadores de estado claros:
+`✓ OK` = en objetivo · `! ATENCIÓN` = por debajo del objetivo · `✗ ALERTA` = fuera de objetivo · `INFO` = sin objetivo fijo · `N/A` = requiere fuente externa
 
 | Familia | KPI | Fuente |
 |---------|-----|--------|
@@ -709,35 +710,32 @@ Los KPIs se agrupan en 6 familias. Los que pueden calcularse directamente de Jir
 | F1 — Calidad de entrada | % HUs con handshake formal | Jira |
 | F2 — Delivery | Lead time medio (Intake → Release) | Jira |
 | F2 — Delivery | Throughput semanal | Jira |
-| F2 — Delivery | Aging del backlog (issues > 30 días sin avanzar) | Jira |
+| F2 — Delivery | Aging medio del backlog | Jira |
 | F3 — Calidad de salida | % releases con UAT formal | Jira |
-| F4 — IA aplicada al PO | % HUs con IA asistida | Jira |
-| F5 — Gobernanza | Urgencias declaradas (último mes) | Jira |
-| F6 — Salud organizativa | Satisfaction score POs | Encuesta manual |
+| F4 — IA aplicada al PO | % HUs IA asistida | Jira (campo + sección DEFINICION) |
+| F5 — Gobernanza | Urgencias declaradas (mes actual) | Jira |
 
-Los 13 KPIs que requieren fuentes externas (GitHub, Sentry, encuestas) aparecen como `N/A` con la fuente indicada.
+Los 13 KPIs restantes (GitHub, Sentry, encuestas de equipo, auditorías) aparecen como `N/A` con la fuente indicada.
 
 **Exportación Markdown**
 
-Con `--export` genera un archivo `YYYY-MM-DD-kpis-FP.md` con:
-- Resumen ejecutivo con alertas
-- Tablas por familia (valor, objetivo, estado)
-- Sección de KPIs sin datos y sus fuentes
+Con `--export` genera `reports/YYYY-MM-DD-kpis-FP.md` con:
+- Resumen ejecutivo (KPIs con datos, en objetivo, con alerta)
+- Tablas por familia con valor, objetivo y estado
+- Sección de alertas activas
 - Checklist de próximas acciones
-
-Útil para compartir en Confluence o en el Comité Semanal.
 
 ---
 
-### `po dashboard` — Pipeline Kanban en terminal
+### `po dashboard` — Pipeline completo con detalle de tickets
 
 **Por qué existe**
 
-Antes del Comité Semanal, el PO necesita una visión rápida de qué hay en cada estado del pipeline sin tener que abrir Jira. El dashboard muestra el estado completo con alertas de SLA (tickets que llevan demasiado tiempo en un estado).
+Antes del Comité Semanal, el PO necesita saber exactamente qué hay en cada estado: no solo cuántos tickets, sino cuáles, quién los lleva, cuánto llevan parados y si hay alguno que ha superado el SLA. El dashboard muestra toda esa información en un vistazo.
 
 **Cuándo usarlo**
 
-Al inicio del Comité Semanal, o cuando quieras revisar el estado del pipeline rápidamente.
+Al inicio del Comité Semanal, o cuando quieras revisar el estado del pipeline sin abrir Jira.
 
 **Cómo usarlo**
 
@@ -745,16 +743,48 @@ Al inicio del Comité Semanal, o cuando quieras revisar el estado del pipeline r
 po dashboard               # pipeline completo
 po dashboard --po ester    # filtrar solo los tickets de Ester
 po dashboard --all         # incluir también los cerrados y rechazados
+po dashboard --export      # exportar a reports/YYYY-MM-DD-dashboard-FP.md
 ```
 
 **Qué muestra**
 
-- Pipeline con el número de issues en cada estado
-- Antigüedad del issue más viejo en cada estado
-- Alertas de SLA cuando un issue lleva demasiado tiempo parado:
-  - INTAKE > 48 h sin triage
-  - SIGN-OFF SH > 5 días sin confirmar
-  - DOR GATE > 2 días sin avanzar
+El dashboard tiene dos partes:
+
+**1. Panel de resumen** (arriba del todo):
+- Métricas clave: activos en pipeline · en desarrollo · SLA en alerta (rojo si > 0) · sin asignar (amarillo si > 0)
+- Mini pipeline: los 10 estados con su conteo actual en dos filas
+
+**2. Bloques por estado** (uno por cada estado Kanban):
+
+```
+  DISCOVERY  ·  1 issue
+   Ticket    Tipo         Descripción                                  Edad       Asignado           Informador
+  ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FP-12     [PROBLEMA]   Cancelación de reservas en CRM          ⚠ 5d SLA   Ester Carrasco     María Ruiz
+```
+
+Columnas:
+- **Ticket** — clave del issue (FP-12)
+- **Tipo** — clasificación de la petición (PROBLEMA, MEJORA, IDEA, URGENCIA, INCIDENCIA)
+- **Descripción** — título truncado
+- **Edad** — tiempo que lleva el ticket en ese estado; en rojo con `⚠ SLA` si supera el límite
+- **Asignado** — PO responsable
+- **Informador** — quién solicitó la petición originalmente
+
+Los estados sin tickets muestran `──── vacío` y se omiten del export.
+
+**SLA configurados:**
+- INTAKE: > 48 h sin pasar a triage
+- SIGN-OFF SH: > 5 días sin confirmación del stakeholder
+- DOR GATE: > 2 días sin avanzar a Handshake
+
+**Exportación Markdown**
+
+Con `--export` genera `reports/YYYY-MM-DD-dashboard-FP.md` con:
+- Resumen ejecutivo con las 4 métricas clave
+- Tabla de distribución de los 10 estados con su SLA
+- Sección **⚠ Alertas SLA** con detalle de tickets bloqueados (solo aparece si hay alguno)
+- Tablas de detalle por estado (solo los estados con issues)
 
 ---
 

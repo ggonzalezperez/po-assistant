@@ -138,15 +138,22 @@ po release FP-12
 ## Comandos de análisis y gestión
 
 ```bash
-# KPIs del pipeline (extraídos de Jira automáticamente)
-po kpis                    # dashboard en terminal
-po kpis --export           # exportar a Markdown (YYYY-MM-DD-kpis-FP.md)
-
 # Visión global del pipeline
-po dashboard               # todos los issues por estado con SLA alerts
+po dashboard               # panel de resumen + tickets por estado con SLA alerts
 po dashboard --po ester    # filtrar por PO
 po dashboard --all         # incluir cerrados y rechazados
+po dashboard --export      # exportar a reports/YYYY-MM-DD-dashboard-FP.md
+
+# KPIs del pipeline (extraídos de Jira automáticamente)
+po kpis                    # dashboard en terminal
+po kpis --export           # exportar a reports/YYYY-MM-DD-kpis-FP.md
+po kpis --weeks 12         # throughput de las últimas 12 semanas
 ```
+
+`po dashboard` muestra dos secciones:
+
+1. **Panel de resumen** — métricas clave (activos, en desarrollo, SLA en alerta, sin asignar) y una vista rápida de los 10 estados con sus conteos.
+2. **Bloques por estado** — cada estado Kanban con su lista de tickets: clave, tipo, descripción, antigüedad, asignado e **informador**. Los tickets que superan el SLA aparecen en rojo.
 
 ---
 
@@ -164,8 +171,8 @@ po dashboard --all         # incluir cerrados y rechazados
 | 8 | `po start-dev FP-12` | Registra leads y mueve a EN DESARROLLO |
 | 9 | `po uat FP-12` | Acta de UAT; si falla, vuelve a EN DESARROLLO |
 | 10 | `po release FP-12` | Checklist de release y cierre del ciclo |
-| — | `po kpis` | Dashboard de KPIs extraídos de Jira |
-| — | `po dashboard` | Pipeline Kanban con antigüedad y SLA alerts |
+| — | `po kpis` | Dashboard de KPIs extraídos de Jira; `--export` → `reports/` |
+| — | `po dashboard` | Panel de resumen + tickets por estado con informador y SLA; `--export` → `reports/` |
 | — | `po setup` | Configura Jira: proyecto, campos, workflow, tablero |
 | — | `po demo` | Demo guiada con caso real Flexicar (~2 min) |
 
