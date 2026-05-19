@@ -72,6 +72,9 @@ def run(
     append_section(jira, issue_key, "DEFINICION", hu_text)
     jira.transition_po_state(issue_key, POEstado.DEFINICION)
 
+    if config.fields.ia_asistida:
+        jira.update_issue(issue_key, {config.fields.ia_asistida: "Sí"})
+
     comment = (
         "## HU borrador — po-assistant\n\n"
         f"- Modelo: `{config.claude_model}`\n"

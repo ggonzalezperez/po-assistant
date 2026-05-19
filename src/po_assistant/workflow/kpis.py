@@ -272,18 +272,26 @@ def _kpi_f3_3(issues: list[JiraIssue]) -> KPIResult:
 
 
 def _kpi_f4_1(issues: list[JiraIssue], config: Config) -> KPIResult:
-    """F4.1 — % HUs IA asistida"""
+    """F4.1 — % HUs IA asistida.
+
+    Primary source: custom field ia_asistida = "Sí".
+    Fallback for older issues: presence of a DEFINICION section in description,
+    which only po define (IA) can create.
+    """
     ia_field = config.fields.ia_asistida
     eligible = [i for i in issues if _estado_value(i) in _AT_OR_AFTER_DEFINICION]
     n = len(eligible)
-    if n == 0 or not ia_field:
+    if n == 0:
         return KPIResult("F4.1", "% HUs IA asistida", "F4", "", "100%", 0, "no_data",
-                         note="Requiere campo IA Asistida y issues en estado >= DEFINICION")
+                         note="Sin issues en estado >= DEFINICION")
     ia_ok = {"sí", "si", "yes", "true"}
     ia_count = 0
     for i in eligible:
-        raw = _get_cf_value(i, ia_field)
+        raw = _get_cf_value(i, ia_field) if ia_field else None
         if raw is not None and str(raw).strip().lower() in ia_ok:
+            ia_count += 1
+        elif raw is None and "DEFINICION" in i.description:
+            # po define always uses IA — treat DEFINICION section as retroactive proxy
             ia_count += 1
     pct = round(100 * ia_count / n)
     status = "ok" if pct == 100 else ("warning" if pct >= 80 else "alert")
