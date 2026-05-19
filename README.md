@@ -32,6 +32,8 @@ Sin una herramienta así, el trabajo del PO es manual, inconsistente y difícil 
 10. RELEASE      →  po release FP-12      Checklist de release y cierre
 ```
 
+> **Flujo de urgencia:** `po urgencia "texto"` — salta los pasos 2-7 y crea el ticket directamente en EN DESARROLLO (paso 8). Continúa normalmente con `po uat` y `po release`.
+
 Cada paso añade un bloque fechado a la descripción del ticket en Jira. Al final, el ticket contiene la historia completa de la HU: decisiones, quién participó, qué cambió y por qué.
 
 ---
@@ -131,6 +133,10 @@ po uat FP-12
 # Deploy a producción
 po release FP-12
 # → Checklist de release; estado RELEASE
+
+# Alternativa para urgencias en producción
+po urgencia "El proceso de compra online devuelve 500 desde las 14:30"
+# → Crea FP-13 directamente en EN DESARROLLO con brief IA y skip de 6 pasos
 ```
 
 ---
@@ -162,6 +168,7 @@ po kpis --weeks 12         # throughput de las últimas 12 semanas
 | Paso | Comando | Qué hace |
 |------|---------|----------|
 | 1 | `po intake "texto"` | Clasifica la petición con IA y crea el ticket |
+| — | `po urgencia "texto"` | Flujo abreviado para urgencias: brief IA + ticket directo a EN DESARROLLO |
 | 2 | `po triage FP-12` | Árbol de decisión: avanza, aplaza, redirige o rechaza |
 | 3 | `po discovery FP-12` | 11 preguntas guiadas para completar el contexto |
 | 4 | `po define FP-12` | Genera la HU completa (6 bloques) con IA |
@@ -288,6 +295,5 @@ uv run pytest tests/ -v
 
 ## Roadmap
 
-- [ ] `po urgencia "texto"` — flujo abreviado para urgencias en producción
 - [ ] `po audit --week` — auditoría DoR semanal automatizada
 - [ ] Integración con `flexicar-po-dashboard` (M7/M8)

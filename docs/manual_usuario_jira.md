@@ -179,6 +179,48 @@ Se crea el ticket `FP-12` con:
 
 ---
 
+### `po urgencia "texto"` — Flujo abreviado para urgencias
+
+**Cuándo usar:** Cuando hay algo roto en producción ahora mismo y no hay tiempo para el flujo completo de 10 pasos. El ticket se crea y queda listo para que el dev lead empiece inmediatamente.
+
+**Pasos que omite:** TRIAGE · DISCOVERY · DEFINICIÓN · SIGN-OFF SH · DOR GATE · HANDSHAKE
+
+**Flujo completo del comando:**
+
+1. La IA analiza el texto y genera un brief estructurado del incidente:
+   - Impacto (quién y qué está afectado)
+   - Causa probable (hipótesis de la IA)
+   - Acción correctiva sugerida
+   - Plan de rollback
+   - Checks de verificación
+2. El PO responde 3 preguntas:
+   - ¿Quién aprueba este fix?
+   - ¿Quién es el dev lead técnico?
+   - ¿Cuál es el tiempo estimado de resolución?
+3. Se crea el ticket en Jira directamente en estado **EN DESARROLLO** con:
+   - Labels: `po-en-desarrollo`, `tipo:urgencia`, `prio:alta`, `flujo:urgencia`
+   - Descripción: brief del incidente + aprobador + dev lead + ETA
+   - Comentario inicial con los datos del responsable
+   - Campo IA Asistida: Sí
+
+**Continuación normal del flujo:**
+
+```bash
+po urgencia "El proceso de compra online devuelve 500 desde las 14:30"
+# → Crea FP-X en EN DESARROLLO
+
+po uat FP-X    # Una vez resuelto el incidente
+po release FP-X
+```
+
+**En el dashboard (`po dashboard`):**
+
+El ticket aparece en el bloque **EN DESARROLLO** con una badge roja `[URGENCIA]`. El campo Informador muestra quién lo reportó.
+
+**Nota:** Usar `po urgencia` no reemplaza el proceso completo para features o mejoras. Es exclusivamente para incidencias que afectan producción en tiempo real.
+
+---
+
 ### Paso 2 — `po triage FP-12`
 
 **Por qué existe este paso**
