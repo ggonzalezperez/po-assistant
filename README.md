@@ -189,7 +189,9 @@ po kpis --weeks 12         # throughput de las últimas 12 semanas
 
 Ningún comando sobreescribe la descripción. Cada uno añade un bloque al final,
 separado por una línea horizontal. Al final del ciclo, el ticket es un registro
-completo de todo lo que pasó:
+completo de todo lo que pasó.
+
+**Flujo normal (10 pasos):**
 
 ```
 ## INTAKE — 2026-05-18
@@ -237,6 +239,33 @@ Validador: María Ruiz. Resultado: OK sin defectos.
 Deploy: 2026-05-31. Checklist completo. Comunicado al negocio.
 ```
 
+**Flujo urgencia (`po urgencia`):**
+
+```
+## URGENCIA — 2026-05-19
+Petición original: El proceso de compra online devuelve 500 desde las 14:30.
+
+Impacto: 100% de compras online bloqueadas desde las 14:30h.
+Causa probable: Posible fallo en la pasarela de pago tras el último deploy.
+Acción correctiva: Revertir el deploy de la tarde o reiniciar el servicio de pago.
+Plan de rollback: Revertir el último deploy en el módulo de checkout.
+Checks: pedido de prueba completado sin error / log sin errores de pago.
+
+Aprobado por: María Ruiz — Responsable Operaciones
+Dev Lead: Carlos López — Backend
+ETA resolución: 2 horas
+
+---
+
+## UAT — 2026-05-19
+Validador: María Ruiz. Resultado: OK — pedidos fluyendo con normalidad.
+
+---
+
+## RELEASE — 2026-05-19
+Deploy: 2026-05-19 17:30. Checklist completo. Comunicado al negocio.
+```
+
 ---
 
 ## Estructura del proyecto
@@ -253,6 +282,7 @@ po-assistant/
 │   ├── workflow/
 │   │   ├── qa.py            # Helpers compartidos: ask(), append_section()…
 │   │   ├── intake.py        # Paso 1 — Clasificación + creación
+│   │   ├── urgencia.py      # Flujo abreviado — Urgencias en producción
 │   │   ├── triage.py        # Paso 2 — Árbol de decisión
 │   │   ├── discovery.py     # Paso 3 — Ficha de discovery
 │   │   ├── definition.py    # Paso 4 — Generación HU con IA

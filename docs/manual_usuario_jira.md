@@ -96,6 +96,14 @@ Una HU normal pasa por 10 pasos. Cada paso tiene un comando:
 10. po release FP-12     →  Checklist de release y cierre
 ```
 
+**Flujo alternativo para urgencias en producción** — salta los pasos 2-7:
+
+```
+po urgencia "texto"  →  Brief IA + ticket directo a EN DESARROLLO
+po uat FP-12         →  Una vez resuelto el incidente
+po release FP-12     →  Checklist y cierre
+```
+
 ---
 
 ## La semana tipo del PO
@@ -120,6 +128,12 @@ Jueves — Sign-offs y Handshakes
 Fin de sprint
   po uat FP-XX             → registrar el acta de validación UAT
   po release FP-XX         → checklist de release y cierre del ciclo
+
+Cuando surge una urgencia en producción
+  po urgencia "descripción del problema"   → brief IA + ticket en EN DESARROLLO
+  (gestionar el fix con el dev lead)
+  po uat FP-XX             → una vez resuelto el incidente
+  po release FP-XX         → checklist y cierre
 
 Viernes — KPIs
   po kpis                  → dashboard en terminal
@@ -181,43 +195,86 @@ Se crea el ticket `FP-12` con:
 
 ### `po urgencia "texto"` — Flujo abreviado para urgencias
 
-**Cuándo usar:** Cuando hay algo roto en producción ahora mismo y no hay tiempo para el flujo completo de 10 pasos. El ticket se crea y queda listo para que el dev lead empiece inmediatamente.
+**Por qué existe este comando**
+
+Cuando algo falla en producción no hay tiempo para el flujo de 10 pasos. `po urgencia` comprime el proceso al mínimo: la IA genera un brief del incidente, el PO responde 3 preguntas, y el ticket queda en manos del dev lead en menos de 2 minutos.
 
 **Pasos que omite:** TRIAGE · DISCOVERY · DEFINICIÓN · SIGN-OFF SH · DOR GATE · HANDSHAKE
 
-**Flujo completo del comando:**
+**Cuándo usarlo**
 
-1. La IA analiza el texto y genera un brief estructurado del incidente:
-   - Impacto (quién y qué está afectado)
-   - Causa probable (hipótesis de la IA)
-   - Acción correctiva sugerida
-   - Plan de rollback
-   - Checks de verificación
-2. El PO responde 3 preguntas:
-   - ¿Quién aprueba este fix?
-   - ¿Quién es el dev lead técnico?
-   - ¿Cuál es el tiempo estimado de resolución?
-3. Se crea el ticket en Jira directamente en estado **EN DESARROLLO** con:
-   - Labels: `po-en-desarrollo`, `tipo:urgencia`, `prio:alta`, `flujo:urgencia`
-   - Descripción: brief del incidente + aprobador + dev lead + ETA
-   - Comentario inicial con los datos del responsable
-   - Campo IA Asistida: Sí
+- Algo en producción está roto y está afectando a usuarios o ventas ahora mismo.
+- No para mejoras, ideas o problemas que pueden esperar al próximo triage.
 
-**Continuación normal del flujo:**
+**Cómo usarlo**
 
 ```bash
 po urgencia "El proceso de compra online devuelve 500 desde las 14:30"
-# → Crea FP-X en EN DESARROLLO
-
-po uat FP-X    # Una vez resuelto el incidente
-po release FP-X
 ```
 
-**En el dashboard (`po dashboard`):**
+**Qué ocurre en el terminal**
+
+```
+─────── Analizando urgencia con IA ──────────────────
+
+  ┌─ URGENCIA  ▲ ALTA ──────────────────────────────────────────────┐
+  │                                                                   │
+  │  [Web] Restaurar proceso de compra online                         │
+  │                                                                   │
+  │  Impacto:             100% de compras bloqueadas desde 14:30h     │
+  │  Causa probable:      Posible fallo en la pasarela de pago tras   │
+  │                       el deploy de las 13:00                      │
+  │  Acción correctiva:   Revertir deploy o reiniciar servicio pago   │
+  │  Plan de rollback:    Revertir el último deploy en checkout       │
+  └───────────────────────────────────────────────────────────────────┘
+
+  ✦ Checks de verificación:
+    1. Pedido de prueba completado sin error
+    2. Log sin errores de conexión a pasarela de pago
+
+─────── Datos del incidente ──────────────────────────
+
+  ¿Quién aprueba este fix? (nombre y rol)
+  → María Ruiz — Responsable Operaciones
+  → ;;
+
+  ¿Quién es el dev lead técnico?
+  → Carlos López — Backend Lead
+  → ;;
+
+  ¿Cuál es el tiempo estimado de resolución?
+  → 2 horas
+  → ;;
+
+  → ¿Crear ticket urgente en Jira y mover a EN DESARROLLO? [S/n]: s
+
+  ✓ Ticket urgente creado: FP-13 → EN DESARROLLO
+    https://flexicar.atlassian.net/browse/FP-13
+
+  Siguiente paso: po uat FP-13  (una vez resuelto el incidente)
+```
+
+**Qué queda en Jira**
+
+Se crea el ticket `FP-13` con:
+- Estado = **EN DESARROLLO** (directo, sin pasos intermedios)
+- Labels: `po-en-desarrollo`, `tipo:urgencia`, `prio:alta`, `flujo:urgencia`
+- Sección `## URGENCIA — YYYY-MM-DD` en la descripción con: petición original, impacto, causa probable, acción correctiva, rollback, checks, aprobador, dev lead y ETA
+- Comentario con los datos del responsable y el siguiente paso
+- Campo **IA Asistida**: Sí
+
+**Continuación del flujo tras resolver el incidente**
+
+```bash
+po uat FP-13      # Registrar que el incidente está resuelto y validado
+po release FP-13  # Checklist de release y cierre
+```
+
+**En el dashboard (`po dashboard`)**
 
 El ticket aparece en el bloque **EN DESARROLLO** con una badge roja `[URGENCIA]`. El campo Informador muestra quién lo reportó.
 
-**Nota:** Usar `po urgencia` no reemplaza el proceso completo para features o mejoras. Es exclusivamente para incidencias que afectan producción en tiempo real.
+**Nota:** `po urgencia` es exclusivamente para incidencias activas en producción. Para features, mejoras o problemas que no bloquean producción, usa el flujo normal empezando por `po intake`.
 
 ---
 
