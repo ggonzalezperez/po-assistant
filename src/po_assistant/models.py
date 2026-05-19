@@ -137,3 +137,16 @@ class JiraIssue:
     @property
     def po_estado(self) -> Optional[POEstado]:
         return POEstado.from_labels(self.labels)
+
+
+@dataclass
+class UrgenciaResult:
+    titulo: str
+    descripcion: str
+    prioridad_sugerida: str
+    razon_prioridad: str
+    impacto: str
+    causa_probable: str
+    accion_correctiva: str
+    rollback: str
+    checks_verificacion: list[str]
