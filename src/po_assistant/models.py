@@ -129,6 +129,7 @@ class JiraIssue:
     status: str
     labels: list[str]
     assignee: Optional[str]
+    reporter: Optional[str] = None
     created: str
     updated: str
     custom_fields: dict = field(default_factory=dict)

@@ -211,6 +211,7 @@ class JiraClient:
             status=f.get("status", {}).get("name", ""),
             labels=f.get("labels", []),
             assignee=(f.get("assignee") or {}).get("displayName"),
+            reporter=(f.get("reporter") or {}).get("displayName"),
             created=f.get("created", ""),
             updated=f.get("updated", ""),
             custom_fields={

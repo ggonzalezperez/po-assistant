@@ -14,7 +14,7 @@ from .config import load_config
 from .display import (
     console, app_header, step_bar, section_rule,
     notify_success, notify_warning, notify_error,
-    pipeline_table, dashboard_estado_block,
+    pipeline_table, dashboard_estado_block, dashboard_summary_panel,
     demo_welcome, demo_scenario_card, demo_summary,
     _help_row, C_MUTED, C_ACCENT, C_PRIMARY, C_SUCCESS, C_ERROR,
     ICON_ARROW,
@@ -427,6 +427,7 @@ def kpis(
 def dashboard(
     po: Optional[str] = typer.Option(None, "--po", help="Filtrar por PO (parte del nombre)"),
     show_closed: bool = typer.Option(False, "--all", "-a", help="Incluir CERRADO y RECHAZADO"),
+    export: bool = typer.Option(False, "--export", "-e", help="Exportar pipeline a Markdown"),
 ):
     """
     [bold]Pipeline[/bold] — Estado de todos los issues del proyecto FP.
@@ -464,7 +465,40 @@ def dashboard(
         POEstado.DOR_GATE:    ">2 días",
     }
 
-    console.print()
+    # ── Summary panel ─────────────────────────────────────────────────────────
+    active    = sum(len(by_estado.get(e.value, [])) for e in ESTADO_ORDER)
+    in_dev    = len(by_estado.get(POEstado.EN_DESARROLLO.value, []))
+    done      = len(by_estado.get(POEstado.CERRADO.value, []))
+    rejected  = len(by_estado.get(POEstado.RECHAZADO.value, []))
+
+    sla_alerts = 0
+    unassigned = 0
+    for estado in ESTADO_ORDER:
+        for issue in by_estado.get(estado.value, []):
+            if not issue.assignee:
+                unassigned += 1
+            max_h = SLA_HOURS.get(estado)
+            if max_h:
+                dt = _parse_date(issue.created)
+                if dt and (now - dt).total_seconds() / 3600 > max_h:
+                    sla_alerts += 1
+
+    pipeline_counts = [
+        (e.display, ESTADO_COLOR.get(e, "white"), len(by_estado.get(e.value, [])))
+        for e in ESTADO_ORDER
+    ]
+
+    dashboard_summary_panel(
+        project_key=config.jira_po_project_key,
+        now_str=now.strftime("%Y-%m-%d %H:%M UTC"),
+        total=len(issues),
+        active=active,
+        in_dev=in_dev,
+        sla_alerts=sla_alerts,
+        unassigned=unassigned,
+        pipeline_counts=pipeline_counts,
+    )
+
     for estado in visible_estados:
         issues_in = by_estado.get(estado.value, [])
         color = ESTADO_COLOR.get(estado, "white")
@@ -494,6 +528,7 @@ def dashboard(
                 "summary":   issue.summary,
                 "age":       age,
                 "assignee":  issue.assignee or "",
+                "reporter":  issue.reporter or "",
                 "sla_alert": sla_alert,
             })
 
@@ -501,15 +536,6 @@ def dashboard(
         label = estado.display if hasattr(estado, "display") else estado.value.upper()
         dashboard_estado_block(label, color, issue_data, sla_label)
 
-    total    = len(issues)
-    done     = len(by_estado.get(POEstado.CERRADO.value, []))
-    rejected = len(by_estado.get(POEstado.RECHAZADO.value, []))
-    in_dev   = len(by_estado.get(POEstado.EN_DESARROLLO.value, []))
-    active   = sum(len(by_estado.get(e.value, [])) for e in ESTADO_ORDER)
-    console.print(
-        f"  [{C_MUTED}]Total: {total}  ·  Activos en pipeline: {active}  "
-        f"·  En desarrollo: {in_dev}  ·  Cerrados: {done}  ·  Rechazados: {rejected}[/{C_MUTED}]"
-    )
     if no_estado:
         console.print(f"  [{C_MUTED}]{len(no_estado)} issue(s) sin etiqueta po-* (fuera del pipeline)[/{C_MUTED}]")
     console.print()
@@ -521,6 +547,15 @@ def dashboard(
         ("po define FP-X", "generar HU"),
     ])
     console.print()
+
+    if export:
+        md_path = _export_dashboard_md(
+            issues_by_estado=by_estado,
+            visible_estados=visible_estados,
+            now=now,
+            project_key=config.jira_po_project_key,
+        )
+        console.print(f"  [green]Pipeline exportado:[/green] [cyan]{md_path}[/cyan]\n")
 
 
 # ── DEMO ─────────────────────────────────────────────────────────────────────
@@ -618,6 +653,114 @@ def _build_alerts(estado: POEstado, issues: list, now: datetime) -> str:
                 age = _fmt_age(now - dt)
                 alerts.append(f"[red]⚠ {issue.key} SLA ({age})[/red]")
     return "  ".join(alerts)
+
+
+def _export_dashboard_md(
+    issues_by_estado: dict,
+    visible_estados: list,
+    now: datetime,
+    project_key: str,
+) -> Path:
+    from datetime import date as _date
+    today_str = _date.today().isoformat()
+    output = Path(f"{today_str}-dashboard-{project_key}.md")
+
+    SLA_LABELS_MD = {
+        POEstado.INTAKE:      ">48h",
+        POEstado.SIGN_OFF_SH: ">5 días",
+        POEstado.DOR_GATE:    ">2 días",
+    }
+
+    # Compute summary metrics for the Markdown header
+    md_active    = sum(len(issues_by_estado.get(e.value, [])) for e in ESTADO_ORDER)
+    md_in_dev    = len(issues_by_estado.get(POEstado.EN_DESARROLLO.value, []))
+    md_sla       = 0
+    md_unassigned = 0
+    for estado in ESTADO_ORDER:
+        for issue in issues_by_estado.get(estado.value, []):
+            if not issue.assignee:
+                md_unassigned += 1
+            max_h = SLA_HOURS.get(estado)
+            if max_h:
+                dt = _parse_date(issue.created)
+                if dt and (now - dt).total_seconds() / 3600 > max_h:
+                    md_sla += 1
+
+    lines: list[str] = [
+        f"# Pipeline PO — {project_key}",
+        f"",
+        f"> Fecha: {today_str}",
+        f"",
+        f"## Resumen",
+        f"",
+        f"| Métrica | Valor |",
+        f"|---------|-------|",
+        f"| Activos en pipeline | {md_active} |",
+        f"| En desarrollo | {md_in_dev} |",
+        f"| SLA en alerta | {'⚠ ' + str(md_sla) if md_sla else str(md_sla)} |",
+        f"| Sin asignar | {md_unassigned} |",
+        f"",
+        f"### Distribución por estado",
+        f"",
+    ]
+
+    for estado in ESTADO_ORDER:
+        lbl = estado.display if hasattr(estado, "display") else estado.value.upper()
+        cnt = len(issues_by_estado.get(estado.value, []))
+        bar = "█" * cnt if cnt > 0 else "—"
+        lines.append(f"- **{lbl}**: {cnt}  {bar}")
+    lines.append("")
+
+    total_active = 0
+    for estado in visible_estados:
+        issues_in = issues_by_estado.get(estado.value, [])
+        label = estado.display if hasattr(estado, "display") else estado.value.upper()
+        sla_label = SLA_LABELS_MD.get(estado, "")
+        n = len(issues_in)
+        total_active += n
+
+        sla_suffix = f" · SLA {sla_label}" if sla_label else ""
+        lines.append(f"## {label}  ({n} issues{sla_suffix})")
+        lines.append("")
+
+        if n == 0:
+            lines.append("_vacío_")
+            lines.append("")
+            continue
+
+        lines.append("| Ticket | Tipo | Descripción | Edad | Asignado | Informador |")
+        lines.append("|--------|------|-------------|------|----------|------------|")
+
+        sorted_issues = sorted(issues_in, key=lambda x: x.created)
+        for issue in sorted_issues:
+            tipo = ""
+            for lbl in (issue.labels or []):
+                if lbl.startswith("tipo:"):
+                    tipo = lbl[len("tipo:"):]
+                    break
+
+            dt = _parse_date(issue.created)
+            age = _fmt_age(now - dt) if dt else "?"
+
+            sla_h = SLA_HOURS.get(estado)
+            sla_flag = ""
+            if sla_h and dt and (now - dt).total_seconds() / 3600 > sla_h:
+                sla_flag = " ⚠"
+
+            summary = issue.summary.replace("|", "\\|")
+            assignee = (issue.assignee or "sin asignar").replace("|", "\\|")
+            reporter = (issue.reporter or "—").replace("|", "\\|")
+            tipo_md = f"[{tipo.upper()}]" if tipo else "—"
+
+            lines.append(f"| {issue.key} | {tipo_md} | {summary} | {age}{sla_flag} | {assignee} | {reporter} |")
+
+        lines.append("")
+
+    lines.append("---")
+    lines.append(f"*Generado con po-assistant · {today_str}*")
+
+    output.write_text("\n".join(lines), encoding="utf-8")
+    return output
 
 
 if __name__ == "__main__":

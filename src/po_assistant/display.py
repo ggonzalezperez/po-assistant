@@ -431,6 +431,68 @@ def pipeline_table(rows: list[dict], project_key: str, now_str: str) -> None:
     console.print(Padding(table, (0, 2)))
 
 
+def dashboard_summary_panel(
+    project_key: str,
+    now_str: str,
+    total: int,
+    active: int,
+    in_dev: int,
+    sla_alerts: int,
+    unassigned: int,
+    pipeline_counts: list[tuple[str, str, int]],  # (display_name, color, count)
+) -> None:
+    """Render the top-of-dashboard summary panel with key metrics and mini pipeline."""
+    # ── Key metrics row ────────────────────────────────────────────────────────
+    metrics = Table(box=None, show_header=False, padding=(0, 2))
+    metrics.add_column(style=C_MUTED,   width=22)
+    metrics.add_column(style="bold white", width=6)
+    metrics.add_column(style=C_MUTED,   width=22)
+    metrics.add_column(style="bold white", width=6)
+    metrics.add_column(style=C_MUTED,   width=22)
+    metrics.add_column(
+        style=("bold red" if sla_alerts > 0 else "bold white"), width=6
+    )
+    metrics.add_column(style=C_MUTED,   width=22)
+    metrics.add_column(
+        style=("bold yellow" if unassigned > 0 else "bold white"), width=6
+    )
+    metrics.add_row(
+        "Activos en pipeline",  str(active),
+        "En desarrollo",        str(in_dev),
+        "SLA en alerta",        str(sla_alerts),
+        "Sin asignar",          str(unassigned),
+    )
+
+    # ── Mini pipeline bar ──────────────────────────────────────────────────────
+    pipeline_parts: list[str] = []
+    for name, color, count in pipeline_counts:
+        short = name[:3] if len(name) > 3 else name  # abbreviate for space
+        if count > 0:
+            pipeline_parts.append(
+                f"[bold {color}]{name}[/bold {color}] [{color}]{count}[/{color}]"
+            )
+        else:
+            pipeline_parts.append(f"[{C_MUTED}]{name} 0[/{C_MUTED}]")
+
+    separator = f"  [{C_MUTED}]·[/{C_MUTED}]  "
+    pipeline_line = separator.join(pipeline_parts)
+
+    content = Group(
+        Padding(metrics, (0, 0)),
+        Padding(Text(""), (0, 0)),
+        Padding(Text.from_markup(pipeline_line), (0, 2)),
+    )
+
+    console.print(Panel(
+        content,
+        title=f"[bold {C_WHITE}]Pipeline {project_key}[/bold {C_WHITE}]   [{C_MUTED}]{now_str}[/{C_MUTED}]",
+        border_style=C_MUTED,
+        box=box.ROUNDED,
+        padding=(1, 1),
+    ))
+    console.print()
+
+
 def dashboard_estado_block(
     display_name: str,
     color: str,
@@ -441,11 +503,10 @@ def dashboard_estado_block(
     Render one Kanban state block for the expanded dashboard view.
 
     Each dict in `issues` has:
-        key (str), tipo (str), summary (str), age (str), assignee (str), sla_alert (bool)
+        key, tipo, summary, age, assignee, reporter (all str), sla_alert (bool)
     """
     n = len(issues)
     issue_word = "issue" if n == 1 else "issues"
-
     header = f"  [{color}]{display_name}[/{color}]  [{C_MUTED}]·  {n} {issue_word}[/{C_MUTED}]"
     if sla_label:
         header += f"  [{C_MUTED}]·  SLA {sla_label}[/{C_MUTED}]"
@@ -456,38 +517,49 @@ def dashboard_estado_block(
         console.print()
         return
 
-    table = Table(box=None, show_header=False, padding=(0, 1))
-    table.add_column("Key",      style=C_ACCENT,  width=8)
-    table.add_column("Tipo",     style=C_MUTED,   width=13)
-    table.add_column("Summary",  min_width=40)
-    table.add_column("Age",      justify="right", width=14)
-    table.add_column("Assignee", style=C_MUTED,   width=22)
+    table = Table(
+        box=box.SIMPLE_HEAD,
+        show_header=True,
+        header_style="bold dim",
+        padding=(0, 1),
+        expand=True,
+    )
+    table.add_column("Ticket",      style=C_ACCENT, width=9)
+    table.add_column("Tipo",        width=14)
+    table.add_column("Descripción", min_width=38)
+    table.add_column("Edad",        justify="right", width=14)
+    table.add_column("Asignado",    style=C_MUTED,   width=20)
+    table.add_column("Informador",  style=C_MUTED,   width=20)
 
     for issue in issues:
         tipo_raw = issue.get("tipo", "")
         if tipo_raw:
-            tipo_cell = f"[dim][{tipo_raw.upper()}][/dim]"
+            type_color, type_label = TYPE_META.get(tipo_raw, (None, tipo_raw.upper()))
+            if type_color:
+                tipo_cell = f"[{type_color}][{type_label}][/{type_color}]"
+            else:
+                tipo_cell = f"[{C_MUTED}][{type_label}][/{C_MUTED}]"
         else:
             tipo_cell = f"[{C_MUTED}]—[/{C_MUTED}]"
 
         summary_raw = issue.get("summary", "")
-        if len(summary_raw) > 62:
-            summary_cell = summary_raw[:62] + "…"
-        else:
-            summary_cell = summary_raw
+        summary_cell = summary_raw[:58] + "…" if len(summary_raw) > 58 else summary_raw
 
         age_raw = issue.get("age", "")
-        if issue.get("sla_alert"):
-            age_cell = f"[red]{age_raw} ⚠ SLA[/red]"
-        else:
-            age_cell = f"[{C_MUTED}]{age_raw}[/{C_MUTED}]"
+        age_cell = (
+            f"[red]{age_raw} ⚠ SLA[/red]" if issue.get("sla_alert")
+            else f"[{C_MUTED}]{age_raw}[/{C_MUTED}]"
+        )
 
         assignee_raw = issue.get("assignee", "")
         assignee_cell = assignee_raw if assignee_raw else f"[{C_MUTED}]sin asignar[/{C_MUTED}]"
 
-        table.add_row(issue["key"], tipo_cell, summary_cell, age_cell, assignee_cell)
+        reporter_raw = issue.get("reporter", "")
+        reporter_cell = reporter_raw if reporter_raw else f"[{C_MUTED}]—[/{C_MUTED}]"
 
-    console.print(Padding(table, (0, 6)))
+        table.add_row(issue["key"], tipo_cell, summary_cell, age_cell, assignee_cell, reporter_cell)
+
+    console.print(Padding(table, (0, 4)))
     console.print()
 
 
